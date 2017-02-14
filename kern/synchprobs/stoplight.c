@@ -77,6 +77,9 @@
 #define TURN_RIGHT 2
 #define WAITING_POS -1
 #define EXIT_POS -2
+#define VERTICAL 1
+#define HORIZONTAL 2
+#define INITIAL 0
 
 //struct lock *intersectionlock;
 struct lock *zero_lock;
@@ -87,11 +90,14 @@ struct lock *three_lock;
 struct cv *one_cv;
 struct cv *two_cv;
 struct cv *three_cv;*/
-//volatile int current_orientation = 0;
+uint32_t current_orientation = 0;
 //volatile int current_route = 0;
 struct rwlock* intersection_lock;
-bool isverticalstraightpresent = false;
-bool ishorizontalstraightpresent = false;
+struct lock* entry_lock;
+struct cv* entry_cv;
+int count;
+//bool isverticalstraightpresent = false;
+//bool ishorizontalstraightpresent = false;
 //struct spinlock * stoplight_spinlock;
 
 
@@ -101,13 +107,16 @@ stoplight_init() {
         one_lock = lock_create("one_lock");
         two_lock = lock_create("two_lock");
         three_lock = lock_create("three_lock");
-	
+	entry_lock = lock_create("entry_lock");
 /*	orientation_lock = lock_create("orientation_lock");
 	detination_lock = lock_create("destination_lock");
 	orientation_cv = cv_create("orientation_cv");
         direction_cv = cv_create("direction_cv");
 */	
+	count=0;
 	intersection_lock = rwlock_create("intersection_lock");
+	current_orientation = INITIAL;
+	entry_cv = cv_create("entry_cv");
 //	spinlock_init(stoplight_spinlock);
 	return;
 }
@@ -120,7 +129,9 @@ void stoplight_cleanup() {
 	lock_destroy(zero_lock);
         lock_destroy(one_lock);       
         lock_destroy(two_lock);       
-        lock_destroy(three_lock);       
+        lock_destroy(three_lock);
+        lock_destroy(entry_lock); 
+        cv_destroy(entry_cv);
 /*        lock_destroy(orientation_lock);       
         lock_destroy(destination_lock);       
 	
@@ -212,6 +223,32 @@ gostraight(uint32_t direction, uint32_t index)
 	leaveIntersection(index);
         lock_release(intersectionlock);
 */
+	/*lock_acquire(entry_lock);
+	if(current_orientation == INITIAL)
+		current_orientation=direction%2;
+	while(current_orientation!=direction%2)
+		cv_wait(entry_cv,entry_lock);
+	count++;
+	lock_release(entry_lock);
+	if(current_orientation!=direction%2)
+		cv_signal(entry_cv,entry_lock);
+	*/
+/*	int isReader;
+	lock_acquire(entry_lock);
+        if(current_orientation == INITIAL)
+                current_orientation=direction%2;
+	if(direction%2==current_orientation)
+	{
+		isReader=true;
+		rwlock_acquire_read(intersection_lock);
+	}
+	else 
+	{
+		isReader = false;
+		rwlock_acquire_write(intersection_lock);
+	}
+	lock_release(entry_lock);
+	*/
 	rwlock_acquire_write(intersection_lock);
 	struct lock * cur_lock;
 	int next_pos = getnextquadrent(direction,WAITING_POS,GO_STRAIGHT);
@@ -230,7 +267,20 @@ gostraight(uint32_t direction, uint32_t index)
         lock_release(cur_lock);        
 	}
         rwlock_release_write(intersection_lock);
+	/*if(current_orientation==direction%2)
+	{
+	lock_acquire(entry_lock);
+        count--;
+	if(count==0)
+		cv_signal(entry_cv,entry_lock);
+        lock_release(entry_lock);
+	}
+	if(isReader)
+		rwlock_release_read(intersection_lock);
+	else
+		rwlock_release_write(intersection_lock);*/
 }
+
 
 void
 turnleft(uint32_t direction, uint32_t index)
