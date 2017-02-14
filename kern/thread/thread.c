@@ -1061,6 +1061,7 @@ wchan_wakeone(struct wchan *wc, struct spinlock *lk)
 	if (target == NULL) {
 		/* Nobody was sleeping. */
 		return;
+	
 	}
 
 	/*

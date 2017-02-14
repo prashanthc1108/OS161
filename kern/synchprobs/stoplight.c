@@ -212,7 +212,7 @@ gostraight(uint32_t direction, uint32_t index)
 	leaveIntersection(index);
         lock_release(intersectionlock);
 */
-	rwlock_acquire_read(intersection_lock);
+	rwlock_acquire_write(intersection_lock);
 	struct lock * cur_lock;
 	int next_pos = getnextquadrent(direction,WAITING_POS,GO_STRAIGHT);
 	while(true)
@@ -229,7 +229,7 @@ gostraight(uint32_t direction, uint32_t index)
         }
         lock_release(cur_lock);        
 	}
-        rwlock_release_read(intersection_lock);
+        rwlock_release_write(intersection_lock);
 }
 
 void

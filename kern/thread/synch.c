@@ -412,9 +412,9 @@ void rwlock_acquire_write(struct rwlock * rwlock)
 
         lock_acquire(rwlock->mutex);
         while (rwlock->isWriterWaiting||rwlock->numberOfReadingThreads>0) {
-		rwlock->isWriterWaiting = true;
                 cv_wait(rwlock->conditionVariable,rwlock->mutex);
-        }
+	 }
+	rwlock->isWriterWaiting = true;
         lock_release(rwlock->mutex);
 
 }
@@ -424,7 +424,6 @@ void rwlock_release_read(struct rwlock * rwlock)
 	KASSERT(rwlock != NULL);
 
         KASSERT(curthread->t_in_interrupt == false);
-
 
 	lock_acquire(rwlock->mutex);
 	
@@ -439,8 +438,6 @@ void rwlock_release_write(struct rwlock * rwlock)
 	KASSERT(rwlock != NULL);
 
         KASSERT(curthread->t_in_interrupt == false);
-
-
         lock_acquire(rwlock->mutex);
 
         rwlock->isWriterWaiting=false;
