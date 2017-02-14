@@ -40,12 +40,24 @@
 #include <test.h>
 #include <synch.h>
 
+
+struct whalehelper* whalehelper;
+
+
 /*
  * Called by the driver during initialization.
  */
 
 void whalemating_init() {
-	return;
+
+	whalehelper = kmalloc(sizeof(*whalehelper));
+        whalehelper->malelock = lock_create("malelock");
+        whalehelper->femalelock = lock_create("femalelock");
+        whalehelper->mathcherlock = lock_create("matcherlock");
+	whalehelper->verifierlock = lock_create("verifierlock");
+        whalehelper->verifier = cv_create("verifier");
+        whalehelper->num_whales = 0;
+	whalehelper->readytomate=false;
 }
 
 /*
@@ -54,18 +66,38 @@ void whalemating_init() {
 
 void
 whalemating_cleanup() {
-	return;
+	KASSERT(whalehelper != NULL);
+	lock_destroy(whalehelper->malelock);
+	lock_destroy(whalehelper->femalelock);
+	lock_destroy(whalehelper->mathcherlock);
+	lock_destroy(whalehelper->verifierlock);
+	cv_destroy(whalehelper->verifier);
+	kfree(whalehelper);
 }
 
 void
 male(uint32_t index)
 {
-	(void)index;
+//	(void)index;
 	/*
 	 * Implement this function by calling male_start and male_end when
 	 * appropriate.
 	 */
-	return;
+	male_start(index);	
+	lock_acquire(whalehelper->malelock);
+	lock_acquire(whalehelper->verifierlock);
+	whalehelper->num_whales++;
+	if(whalehelper->num_whales==3)
+		whalehelper->readytomate=true;
+	while(!whalehelper->readytomate)
+		cv_wait(whalehelper->verifier,whalehelper->verifierlock);
+	cv_signal(whalehelper->verifier,whalehelper->verifierlock);	
+	lock_release(whalehelper->verifierlock);
+	whalehelper->num_whales--;
+	if(whalehelper->num_whales==0)
+		whalehelper->readytomate=false;
+	lock_release(whalehelper->malelock); 	
+	male_end(index);
 }
 
 void
@@ -76,7 +108,22 @@ female(uint32_t index)
 	 * Implement this function by calling female_start and female_end when
 	 * appropriate.
 	 */
-	return;
+	female_start(index);
+        lock_acquire(whalehelper->femalelock);
+        lock_acquire(whalehelper->verifierlock);
+        whalehelper->num_whales++;
+        if(whalehelper->num_whales==3)
+                whalehelper->readytomate=true;
+        while(!whalehelper->readytomate)
+                cv_wait(whalehelper->verifier,whalehelper->verifierlock);
+        cv_signal(whalehelper->verifier,whalehelper->verifierlock);
+        lock_release(whalehelper->verifierlock);
+        whalehelper->num_whales--;
+        if(whalehelper->num_whales==0)
+                whalehelper->readytomate=false;
+        lock_release(whalehelper->femalelock);
+        female_end(index);
+
 }
 
 void
@@ -87,5 +134,21 @@ matchmaker(uint32_t index)
 	 * Implement this function by calling matchmaker_start and matchmaker_end
 	 * when appropriate.
 	 */
-	return;
+	matchmaker_start(index);
+        lock_acquire(whalehelper->mathcherlock);
+        lock_acquire(whalehelper->verifierlock);
+        whalehelper->num_whales++;            
+        if(whalehelper->num_whales==3)        
+                whalehelper->readytomate=true;
+        while(!whalehelper->readytomate)
+                cv_wait(whalehelper->verifier,whalehelper->verifierlock);
+        cv_signal(whalehelper->verifier,whalehelper->verifierlock);
+        lock_release(whalehelper->verifierlock);
+        whalehelper->num_whales--;
+        if(whalehelper->num_whales==0)
+                whalehelper->readytomate=false;
+        lock_release(whalehelper->mathcherlock);
+        matchmaker_end(index);       
+
 }
+

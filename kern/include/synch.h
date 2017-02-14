@@ -75,7 +75,12 @@ void V(struct semaphore *);
 struct lock {
         char *lk_name;
         HANGMAN_LOCKABLE(lk_hangman);   /* Deadlock detector hook. */
-        // add what you need here
+   	struct wchan *lk_wchan;
+	struct spinlock lk_lock;
+	volatile bool is_acquired;
+	struct thread* holding_thread;        
+	volatile int waiting_thread_count; 
+	// add what you need here
         // (don't forget to mark things volatile as needed)
 };
 
@@ -113,7 +118,9 @@ bool lock_do_i_hold(struct lock *);
  */
 
 struct cv {
-        char *cv_name;
+	char *cv_name;
+	struct wchan *cv_wchan;
+	struct spinlock cv_lock;
         // add what you need here
         // (don't forget to mark things volatile as needed)
 };
@@ -150,7 +157,12 @@ void cv_broadcast(struct cv *cv, struct lock *lock);
 
 struct rwlock {
         char *rwlock_name;
-        // add what you need here
+        struct lock *mutex;
+	struct cv *conditionVariable;
+	volatile int numberOfReadingThreads;
+	volatile bool isWriterWaiting;
+
+	// add what you need here
         // (don't forget to mark things volatile as needed)
 };
 
@@ -173,5 +185,20 @@ void rwlock_acquire_read(struct rwlock *);
 void rwlock_release_read(struct rwlock *);
 void rwlock_acquire_write(struct rwlock *);
 void rwlock_release_write(struct rwlock *);
+
+struct whalehelper{
+	struct lock *malelock;
+	struct lock *femalelock;
+ 	struct lock *mathcherlock;
+	struct lock * verifierlock;
+	struct cv *verifier;
+	volatile int num_whales;
+	volatile bool readytomate;
+};
+
+
+int getnextquadrent(int direction,int currentquadrent,int turn);
+struct lock* getlockforquadrent(int quadrent);
+bool is_reader_or_writer(int direction,int destination);
 
 #endif /* _SYNCH_H_ */
