@@ -471,6 +471,7 @@ void rwlock_release_write(struct rwlock * rwlock)
         cv_broadcast(rwlock->conditionVariable,rwlock->mutex);
         lock_release(rwlock->mutex);
 */
+	KASSERT(rwlock->sem2->sem_count==0);
 	V(rwlock->sem2);
 }
 
