@@ -193,7 +193,6 @@ struct whalehelper{
 	struct lock * verifierlock;
 	struct cv *verifier;
 	volatile int num_whales;
-	volatile bool readytomate;
 	volatile int num_whales_exited;
 };
 
