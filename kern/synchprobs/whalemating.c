@@ -41,16 +41,17 @@
 #include <synch.h>
 
 
-struct whalehelper* whalehelper;
-
-
+//struct whalehelper* whalehelper;
+struct semaphore* sem1;
+struct semaphore* sem2;
+struct lock* matcher_lock;
 /*
  * Called by the driver during initialization.
  */
 
 void whalemating_init() {
 
-	whalehelper = kmalloc(sizeof(*whalehelper));
+/*	whalehelper = kmalloc(sizeof(*whalehelper));
         whalehelper->malelock = lock_create("malelock");
         whalehelper->femalelock = lock_create("femalelock");
         whalehelper->mathcherlock = lock_create("matcherlock");
@@ -58,7 +59,13 @@ void whalemating_init() {
         whalehelper->verifier = cv_create("verifier");
         whalehelper->num_whales = 0;
 	whalehelper->num_whales_exited = 0;
+*/
+	sem1 = sem_create("sem1",0);
+	sem2 = sem_create("sem2",0);
+	matcher_lock = lock_create("lock1");
+	
 }
+
 
 /*
  * Called by the driver during teardown.
@@ -66,13 +73,18 @@ void whalemating_init() {
 
 void
 whalemating_cleanup() {
-	KASSERT(whalehelper != NULL);
+/*	KASSERT(whalehelper != NULL);
 	lock_destroy(whalehelper->malelock);
 	lock_destroy(whalehelper->femalelock);
 	lock_destroy(whalehelper->mathcherlock);
 	lock_destroy(whalehelper->verifierlock);
 	cv_destroy(whalehelper->verifier);
 	kfree(whalehelper);
+*/
+	sem_destroy(sem1);
+	sem_destroy(sem2);
+	lock_destroy(matcher_lock);
+
 }
 
 void
@@ -83,7 +95,7 @@ male(uint32_t index)
 	 * Implement this function by calling male_start and male_end when
 	 * appropriate.
 	 */
-	male_start(index);	
+/*	male_start(index);	
 	lock_acquire(whalehelper->malelock);
 	lock_acquire(whalehelper->verifierlock);
 	whalehelper->num_whales++;
@@ -95,6 +107,10 @@ male(uint32_t index)
 	lock_release(whalehelper->verifierlock);
 	lock_release(whalehelper->malelock); 	
 	male_end(index);
+*/
+	male_start(index);
+	P(sem1);  
+	male_end(index);
 }
 
 void
@@ -105,7 +121,7 @@ female(uint32_t index)
 	 * Implement this function by calling female_start and female_end when
 	 * appropriate.
 	 */
-	female_start(index);
+/*	female_start(index);
         lock_acquire(whalehelper->femalelock);
         lock_acquire(whalehelper->verifierlock);
         whalehelper->num_whales++;
@@ -117,18 +133,21 @@ female(uint32_t index)
 	lock_release(whalehelper->verifierlock);
         lock_release(whalehelper->femalelock);
         female_end(index);
-
+*/
+	female_start(index);
+	P(sem2);
+	female_end(index);
 }
 
 void
 matchmaker(uint32_t index)
 {
-	(void)index;
+//	(void)index;
 	/*
 	 * Implement this function by calling matchmaker_start and matchmaker_end
 	 * when appropriate.
 	 */
-	matchmaker_start(index);
+/*	matchmaker_start(index);
         lock_acquire(whalehelper->mathcherlock);
         lock_acquire(whalehelper->verifierlock);
         whalehelper->num_whales++;            
@@ -141,6 +160,12 @@ matchmaker(uint32_t index)
         lock_release(whalehelper->verifierlock);
 	lock_release(whalehelper->mathcherlock);
         matchmaker_end(index);       
-
+*/
+	matchmaker_start(index);
+	lock_acquire(matcher_lock);
+	V(sem1);
+	V(sem2);
+	lock_release(matcher_lock);
+	matchmaker_end(index); 
 }
 
