@@ -157,11 +157,15 @@ void cv_broadcast(struct cv *cv, struct lock *lock);
 
 struct rwlock {
         char *rwlock_name;
-        struct lock *mutex;
+/*        struct lock *mutex;
 	struct cv *conditionVariable;
 	volatile int numberOfReadingThreads;
 	volatile bool isWriterWaiting;
-
+*/
+	struct semaphore* sem1;
+	struct semaphore* sem2;
+	struct semaphore* sem3;
+	int reader_count;  
 	// add what you need here
         // (don't forget to mark things volatile as needed)
 };

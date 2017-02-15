@@ -372,19 +372,26 @@ struct rwlock * rwlock_create(const char * name)
 		return NULL;
 	}	
 
-	rwlock->conditionVariable = cv_create("rw_cv");
+/*	rwlock->conditionVariable = cv_create("rw_cv");
 	rwlock->mutex = lock_create("rw_lock");
 	rwlock->numberOfReadingThreads = 0;
 	rwlock->isWriterWaiting = false;
-	
+*/
+	rwlock->sem1 = sem_create("one",1);
+        rwlock->sem2 =  sem_create("two",1);
+        rwlock->sem3 = sem_create("three",1);
+        rwlock->reader_count = 0;	
 	return rwlock;
 }
 
 void rwlock_destroy(struct rwlock * rwlock)
 {
 	KASSERT(rwlock != NULL);
-        lock_destroy(rwlock->mutex);
-	cv_destroy(rwlock->conditionVariable);
+       /* lock_destroy(rwlock->mutex);
+	cv_destroy(rwlock->conditionVariable);*/
+	sem_destroy(rwlock->sem1);
+	sem_destroy(rwlock->sem2);
+	sem_destroy(rwlock->sem3);
 	kfree(rwlock->rwlock_name);
         kfree(rwlock);
 }
@@ -394,14 +401,22 @@ void rwlock_acquire_read(struct rwlock * rwlock)
 	KASSERT(rwlock != NULL);
 
         KASSERT(curthread->t_in_interrupt == false);
-
+/*
 	lock_acquire(rwlock->mutex);
         while (rwlock->isWriterWaiting) {
         	cv_wait(rwlock->conditionVariable,rwlock->mutex);
 	}
 	rwlock->numberOfReadingThreads++;
 	lock_release(rwlock->mutex);	
-
+*/
+	P(rwlock->sem1);
+	P(rwlock->sem3);
+	if(rwlock->reader_count==0)
+		P(rwlock->sem2);
+	rwlock->reader_count++;
+	V(rwlock->sem1);
+	V(rwlock->sem3);
+	
 }
 
 void rwlock_acquire_write(struct rwlock * rwlock)
@@ -410,13 +425,16 @@ void rwlock_acquire_write(struct rwlock * rwlock)
 
         KASSERT(curthread->t_in_interrupt == false);
 
-        lock_acquire(rwlock->mutex);
+/*        lock_acquire(rwlock->mutex);
         while (rwlock->isWriterWaiting||rwlock->numberOfReadingThreads>0) {
                 cv_wait(rwlock->conditionVariable,rwlock->mutex);
 	 }
 	rwlock->isWriterWaiting = true;
         lock_release(rwlock->mutex);
-
+*/
+	P(rwlock->sem1);
+	P(rwlock->sem2);
+	V(rwlock->sem1);
 }
 
 void rwlock_release_read(struct rwlock * rwlock)
@@ -424,7 +442,7 @@ void rwlock_release_read(struct rwlock * rwlock)
 	KASSERT(rwlock != NULL);
 
         KASSERT(curthread->t_in_interrupt == false);
-
+/*
 	lock_acquire(rwlock->mutex);
 	KASSERT(rwlock->numberOfReadingThreads>=1);
 	rwlock->numberOfReadingThreads--;
@@ -432,6 +450,14 @@ void rwlock_release_read(struct rwlock * rwlock)
 	if(rwlock->numberOfReadingThreads==0)
 		cv_signal(rwlock->conditionVariable,rwlock->mutex);
   	lock_release(rwlock->mutex);
+*/
+	P(rwlock->sem3);
+	KASSERT(rwlock->reader_count>=1);
+	rwlock->reader_count--;
+	if(rwlock->reader_count==0)
+		V(rwlock->sem2);
+	V(rwlock->sem3);
+	
 }
 
 void rwlock_release_write(struct rwlock * rwlock)
@@ -439,10 +465,12 @@ void rwlock_release_write(struct rwlock * rwlock)
 	KASSERT(rwlock != NULL);
 
         KASSERT(curthread->t_in_interrupt == false);
-        lock_acquire(rwlock->mutex);
+/*        lock_acquire(rwlock->mutex);
 	KASSERT(rwlock->isWriterWaiting==true);
         rwlock->isWriterWaiting=false;
         cv_broadcast(rwlock->conditionVariable,rwlock->mutex);
         lock_release(rwlock->mutex);
+*/
+	V(rwlock->sem2);
 }
 
