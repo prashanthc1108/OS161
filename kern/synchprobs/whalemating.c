@@ -58,6 +58,7 @@ void whalemating_init() {
         whalehelper->verifier = cv_create("verifier");
         whalehelper->num_whales = 0;
 	whalehelper->readytomate=false;
+	whalehelper->num_whales_exited = 0;
 }
 
 /*
@@ -87,15 +88,12 @@ male(uint32_t index)
 	lock_acquire(whalehelper->malelock);
 	lock_acquire(whalehelper->verifierlock);
 	whalehelper->num_whales++;
-	if(whalehelper->num_whales==3)
-		whalehelper->readytomate=true;
-	while(!whalehelper->readytomate)
+	while(whalehelper->num_whales%3!=0)
 		cv_wait(whalehelper->verifier,whalehelper->verifierlock);
-	cv_signal(whalehelper->verifier,whalehelper->verifierlock);	
+	whalehelper->num_whales_exited++;
+        if(whalehelper->num_whales!=whalehelper->num_whales_exited)
+                cv_signal(whalehelper->verifier,whalehelper->verifierlock);
 	lock_release(whalehelper->verifierlock);
-	whalehelper->num_whales--;
-	if(whalehelper->num_whales==0)
-		whalehelper->readytomate=false;
 	lock_release(whalehelper->malelock); 	
 	male_end(index);
 }
@@ -112,15 +110,12 @@ female(uint32_t index)
         lock_acquire(whalehelper->femalelock);
         lock_acquire(whalehelper->verifierlock);
         whalehelper->num_whales++;
-        if(whalehelper->num_whales==3)
-                whalehelper->readytomate=true;
-        while(!whalehelper->readytomate)
+        while(whalehelper->num_whales%3!=0)
                 cv_wait(whalehelper->verifier,whalehelper->verifierlock);
-        cv_signal(whalehelper->verifier,whalehelper->verifierlock);
-        lock_release(whalehelper->verifierlock);
-        whalehelper->num_whales--;
-        if(whalehelper->num_whales==0)
-                whalehelper->readytomate=false;
+         whalehelper->num_whales_exited++;
+        if(whalehelper->num_whales!=whalehelper->num_whales_exited)
+                cv_signal(whalehelper->verifier,whalehelper->verifierlock);
+	lock_release(whalehelper->verifierlock);
         lock_release(whalehelper->femalelock);
         female_end(index);
 
@@ -138,16 +133,14 @@ matchmaker(uint32_t index)
         lock_acquire(whalehelper->mathcherlock);
         lock_acquire(whalehelper->verifierlock);
         whalehelper->num_whales++;            
-        if(whalehelper->num_whales==3)        
-                whalehelper->readytomate=true;
-        while(!whalehelper->readytomate)
+        while(whalehelper->num_whales%3!=0)
                 cv_wait(whalehelper->verifier,whalehelper->verifierlock);
-        cv_signal(whalehelper->verifier,whalehelper->verifierlock);
+        whalehelper->num_whales_exited++;
+	if(whalehelper->num_whales!=whalehelper->num_whales_exited)
+        	cv_signal(whalehelper->verifier,whalehelper->verifierlock);
+        
         lock_release(whalehelper->verifierlock);
-        whalehelper->num_whales--;
-        if(whalehelper->num_whales==0)
-                whalehelper->readytomate=false;
-        lock_release(whalehelper->mathcherlock);
+	lock_release(whalehelper->mathcherlock);
         matchmaker_end(index);       
 
 }

@@ -440,7 +440,7 @@ void rwlock_release_write(struct rwlock * rwlock)
 
         KASSERT(curthread->t_in_interrupt == false);
         lock_acquire(rwlock->mutex);
-	KASSERT(rwlock->isWriterWaiting=true);
+	KASSERT(rwlock->isWriterWaiting==true);
         rwlock->isWriterWaiting=false;
         cv_broadcast(rwlock->conditionVariable,rwlock->mutex);
         lock_release(rwlock->mutex);

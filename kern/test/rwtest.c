@@ -42,7 +42,7 @@ int rwtest3(int nargs, char **args) {
 
 //	kprintf_n("rwt3 unimplemented\n");
 //	success(TEST161_SUCCESS, SECRET, "rwt3");
-	struct rwlock* rw=NULL; 
+	struct rwlock* rw=rwlock_create("rwlock"); 
 	rwlock_release_write(rw);
 	return 0;
 }
@@ -54,7 +54,7 @@ int rwtest4(int nargs, char **args) {
 //	kprintf_n("rwt4 unimplemented\n");
 //	success(TEST161_SUCCESS, SECRET, "rwt4");
 	
-	struct rwlock* rw=NULL; 
+	struct rwlock* rw=rwlock_create("rwlock"); 
 	rwlock_release_write(rw);
 	return 0;
 }
@@ -65,7 +65,7 @@ int rwtest5(int nargs, char **args) {
 
 //	kprintf_n("rwt5 unimplemented\n");
 //	success(TEST161_SUCCESS, SECRET, "rwt5");
-	struct rwlock* rw=NULL; 
+	struct rwlock* rw=rwlock_create("rwlock"); 
 	rwlock_release_write(rw);
 	return 0;
 }
