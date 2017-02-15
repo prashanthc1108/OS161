@@ -57,7 +57,6 @@ void whalemating_init() {
 	whalehelper->verifierlock = lock_create("verifierlock");
         whalehelper->verifier = cv_create("verifier");
         whalehelper->num_whales = 0;
-	whalehelper->readytomate=false;
 	whalehelper->num_whales_exited = 0;
 }
 
