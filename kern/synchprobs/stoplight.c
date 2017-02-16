@@ -77,25 +77,26 @@
 #define TURN_RIGHT 2
 #define WAITING_POS -1
 #define EXIT_POS -2
-#define VERTICAL 1
+/*#define VERTICAL 1
 #define HORIZONTAL 2
 #define INITIAL 0
-
-//struct lock *intersectionlock;
+*/
 struct lock *zero_lock;
 struct lock *one_lock;
 struct lock *two_lock;
 struct lock *three_lock;
+//struct rwlock* intersection_lock;
+struct semaphore* intersection_sem;
+//struct lock *intersectionlock;
 /*struct cv *zero_cv;
 struct cv *one_cv;
 struct cv *two_cv;
 struct cv *three_cv;*/
-uint32_t current_orientation = 0;
+//uint32_t current_orientation = 0;
 //volatile int current_route = 0;
-struct rwlock* intersection_lock;
-struct lock* entry_lock;
-struct cv* entry_cv;
-int count;
+//struct lock* entry_lock;
+//struct cv* entry_cv;
+//int count;
 //bool isverticalstraightpresent = false;
 //bool ishorizontalstraightpresent = false;
 //struct spinlock * stoplight_spinlock;
@@ -107,18 +108,28 @@ stoplight_init() {
         one_lock = lock_create("one_lock");
         two_lock = lock_create("two_lock");
         three_lock = lock_create("three_lock");
-	entry_lock = lock_create("entry_lock");
+//	intersection_lock = rwlock_create("intersection_lock");
+	intersection_sem = sem_create("intersection_sem",3);
+
+
+
+
+
+//code below was for previous attempts. ignore...
+
+
+
+//	entry_lock = lock_create("entry_lock");
 /*	orientation_lock = lock_create("orientation_lock");
 	detination_lock = lock_create("destination_lock");
 	orientation_cv = cv_create("orientation_cv");
         direction_cv = cv_create("direction_cv");
 */	
-	count=0;
-	intersection_lock = rwlock_create("intersection_lock");
-	current_orientation = INITIAL;
-	entry_cv = cv_create("entry_cv");
+//	count=0;
+//	current_orientation = INITIAL;
+//	entry_cv = cv_create("entry_cv");
 //	spinlock_init(stoplight_spinlock);
-	return;
+//	return;
 }
 
 /*
@@ -130,15 +141,25 @@ void stoplight_cleanup() {
         lock_destroy(one_lock);       
         lock_destroy(two_lock);       
         lock_destroy(three_lock);
-        lock_destroy(entry_lock); 
-        cv_destroy(entry_cv);
+//	rwlock_destroy(intersection_lock);
+	sem_destroy(intersection_sem);  
+
+
+
+
+
+
+//code below was for previous attempts. ignore...
+
+
+      //lock_destroy(entry_lock); 
+        //cv_destroy(entry_cv);
 /*        lock_destroy(orientation_lock);       
         lock_destroy(destination_lock);       
 	
         cv_destroy(orientation_cv);
         cv_destroy(destination_cv);
 	return;*/
-	rwlock_destroy(intersection_lock);
 //	spinlock_cleanup(stoplight_spinlock);
 }
 
@@ -146,6 +167,42 @@ void stoplight_cleanup() {
 void
 turnright(uint32_t direction, uint32_t index)
 {
+
+	P(intersection_sem);
+	int next_pos = getnextquadrent(direction,WAITING_POS,GO_STRAIGHT);
+        struct lock* cur_lock = getlockforquadrent(next_pos);
+        lock_acquire(cur_lock);
+        inQuadrant(next_pos,index);
+        leaveIntersection(index);
+        lock_release(cur_lock);
+	V(intersection_sem);
+
+
+
+
+//this code was the first successful attempt
+
+/*	rwlock_acquire_read(intersection_lock);
+	int next_pos = getnextquadrent(direction,WAITING_POS,GO_STRAIGHT);
+	struct lock* cur_lock = getlockforquadrent(next_pos);
+	lock_acquire(cur_lock);
+	inQuadrant(next_pos,index);
+	leaveIntersection(index);
+        lock_release(cur_lock);
+	rwlock_release_read(intersection_lock);
+
+*/
+
+
+
+//code below was for previous attempts. ignore...
+
+
+
+
+
+
+
 /* 	lock_acquire(intersectionlock);
         int next_pos = getnextquadrent(direction,WAITING_POS,TURN_RIGHT);
         while(next_pos!=EXIT_POS)
@@ -200,20 +257,74 @@ turnright(uint32_t direction, uint32_t index)
         lock_release(lock);
         leaveIntersection(index);
 */
-	rwlock_acquire_read(intersection_lock);
-	int next_pos = getnextquadrent(direction,WAITING_POS,GO_STRAIGHT);
-	struct lock* cur_lock = getlockforquadrent(next_pos);
-	lock_acquire(cur_lock);
-	inQuadrant(next_pos,index);
-	leaveIntersection(index);
-        lock_release(cur_lock);
-	rwlock_release_read(intersection_lock);
 }	
 	
 void
 gostraight(uint32_t direction, uint32_t index)
 {
- /*	lock_acquire(intersectionlock);
+
+
+
+
+	P(intersection_sem);
+	struct lock * cur_lock;
+	struct lock * prev_lock = NULL;
+        int next_pos = getnextquadrent(direction,WAITING_POS,GO_STRAIGHT);
+        while(true)
+        {
+        cur_lock = getlockforquadrent(next_pos);
+        lock_acquire(cur_lock);
+        inQuadrant(next_pos,index);
+	if(prev_lock!=NULL)
+		lock_release(prev_lock);
+	prev_lock = cur_lock;
+        next_pos = getnextquadrent(direction,next_pos,GO_STRAIGHT);
+        if(next_pos== EXIT_POS)
+        {       
+                leaveIntersection(index);
+                lock_release(cur_lock);
+                break;
+        }
+        //lock_release(cur_lock);        
+        }
+	V(intersection_sem);
+
+
+
+
+//this code was the first successful attempt
+
+
+/*
+	rwlock_acquire_read(intersection_lock);
+	struct lock * cur_lock;
+	int next_pos = getnextquadrent(direction,WAITING_POS,GO_STRAIGHT);
+	while(true)
+        {
+        cur_lock = getlockforquadrent(next_pos);
+	lock_acquire(cur_lock);
+        inQuadrant(next_pos,index);
+        next_pos = getnextquadrent(direction,next_pos,GO_STRAIGHT);
+	if(next_pos== EXIT_POS)
+        {       
+                leaveIntersection(index);
+                lock_release(cur_lock);
+                break;
+        }
+        lock_release(cur_lock);        
+	}
+        rwlock_release_read(intersection_lock);
+ 
+*/
+
+
+
+//code below was for previous attempts. ignore...
+
+
+
+
+/*	lock_acquire(intersectionlock);
         int next_pos = getnextquadrent(direction,WAITING_POS,GO_STRAIGHT);
         while(next_pos!=EXIT_POS)
 	{
@@ -249,24 +360,6 @@ gostraight(uint32_t direction, uint32_t index)
 	}
 	lock_release(entry_lock);
 	*/
-	rwlock_acquire_write(intersection_lock);
-	struct lock * cur_lock;
-	int next_pos = getnextquadrent(direction,WAITING_POS,GO_STRAIGHT);
-	while(true)
-        {
-        cur_lock = getlockforquadrent(next_pos);
-	lock_acquire(cur_lock);
-        inQuadrant(next_pos,index);
-        next_pos = getnextquadrent(direction,next_pos,GO_STRAIGHT);
-	if(next_pos== EXIT_POS)
-        {       
-                leaveIntersection(index);
-                lock_release(cur_lock);
-                break;
-        }
-        lock_release(cur_lock);        
-	}
-        rwlock_release_write(intersection_lock);
 	/*if(current_orientation==direction%2)
 	{
 	lock_acquire(entry_lock);
@@ -285,16 +378,36 @@ gostraight(uint32_t direction, uint32_t index)
 void
 turnleft(uint32_t direction, uint32_t index)
 {
- /*	lock_acquire(intersectionlock);
-        int next_pos = getnextquadrent(direction,WAITING_POS,TURN_LEFT);
-        while(next_pos!=EXIT_POS)
-	{
-	inQuadrant(next_pos,index);
-	next_pos = getnextquadrent(direction,next_pos,TURN_LEFT);
-	}
-	leaveIntersection(index);
-        lock_release(intersectionlock);
-*/
+
+
+
+	P(intersection_sem);
+	struct lock * cur_lock;
+        struct lock * prev_lock = NULL;
+	int next_pos = getnextquadrent(direction,WAITING_POS,TURN_LEFT);
+        while(true)
+        {
+        cur_lock = getlockforquadrent(next_pos);
+        lock_acquire(cur_lock);
+        inQuadrant(next_pos,index);
+	if(prev_lock!=NULL)
+                lock_release(prev_lock);
+        prev_lock = cur_lock;
+        next_pos = getnextquadrent(direction,next_pos,TURN_LEFT);
+        if(next_pos== EXIT_POS)
+        {
+                leaveIntersection(index);
+                lock_release(cur_lock);
+                break;
+        }
+        //lock_release(cur_lock);
+        }
+	V(intersection_sem);
+
+
+//first succesful attempt
+
+/*
 	struct lock * cur_lock;
 	rwlock_acquire_write(intersection_lock);
 	int next_pos = getnextquadrent(direction,WAITING_POS,TURN_LEFT);
@@ -313,6 +426,28 @@ turnleft(uint32_t direction, uint32_t index)
 	lock_release(cur_lock);
         }
         rwlock_release_write(intersection_lock);
+ 
+*/
+
+
+
+//code below was for previous attempts. ignore...
+
+
+
+
+
+
+/*	lock_acquire(intersectionlock);
+        int next_pos = getnextquadrent(direction,WAITING_POS,TURN_LEFT);
+        while(next_pos!=EXIT_POS)
+	{
+	inQuadrant(next_pos,index);
+	next_pos = getnextquadrent(direction,next_pos,TURN_LEFT);
+	}
+	leaveIntersection(index);
+        lock_release(intersectionlock);
+*/
 
 }
 

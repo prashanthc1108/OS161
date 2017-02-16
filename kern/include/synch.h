@@ -189,7 +189,7 @@ void rwlock_acquire_read(struct rwlock *);
 void rwlock_release_read(struct rwlock *);
 void rwlock_acquire_write(struct rwlock *);
 void rwlock_release_write(struct rwlock *);
-
+/*
 struct whalehelper{
 	struct lock *malelock;
 	struct lock *femalelock;
@@ -199,10 +199,10 @@ struct whalehelper{
 	volatile int num_whales;
 	volatile int num_whales_exited;
 };
-
+*/
 
 int getnextquadrent(int direction,int currentquadrent,int turn);
 struct lock* getlockforquadrent(int quadrent);
-bool is_reader_or_writer(int direction,int destination);
+//bool is_reader_or_writer(int direction,int destination);
 
 #endif /* _SYNCH_H_ */
