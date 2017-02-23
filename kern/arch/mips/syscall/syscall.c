@@ -110,14 +110,19 @@ syscall(struct trapframe *tf)
 		break;
 
 	    /* Add stuff here */
-
+	    case SYS_write:
+		err = sys___write(tf->tf_a0,(userptr_t)tf->tf_a1,tf->tf_a2);
+		break;
+            case SYS__exit:
+		thread_exit();	
+		break;
 	    default:
 		kprintf("Unknown syscall %d\n", callno);
 		err = ENOSYS;
 		break;
 	}
 
-
+	
 	if (err) {
 		/*
 		 * Return the error code. This gets converted at

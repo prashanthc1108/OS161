@@ -58,5 +58,5 @@ __DEAD void enter_new_process(int argc, userptr_t argv, userptr_t env,
 
 int sys_reboot(int code);
 int sys___time(userptr_t user_seconds, userptr_t user_nanoseconds);
-
+int sys___write(volatile int fd, userptr_t buffer,volatile size_t len);
 #endif /* _SYSCALL_H_ */
