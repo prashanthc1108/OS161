@@ -102,6 +102,8 @@ copyfail(void)
 	longjmp(curthread->t_machdep.tm_copyjmp, 1);
 }
 
+
+
 /*
  * Memory region check function. This checks to make sure the block of
  * user memory provided (an address and a length) falls within the
@@ -142,6 +144,10 @@ copycheck(const_userptr_t userptr, size_t len, size_t *stoplen)
 	return 0;
 }
 
+int newcopycheck(const_userptr_t userptr, size_t len, size_t *stoplen)
+{
+	return copycheck(userptr, len, stoplen);
+}
 /*
  * copyin
  *

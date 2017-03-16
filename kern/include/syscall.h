@@ -45,7 +45,7 @@ void syscall(struct trapframe *tf);
  */
 
 /* Helper for fork(). You write this. */
-void enter_forked_process(struct trapframe *tf);
+void enter_forked_process(void *data,unsigned long i);
 
 /* Enter user mode. Does not return. */
 __DEAD void enter_new_process(int argc, userptr_t argv, userptr_t env,
@@ -58,5 +58,18 @@ __DEAD void enter_new_process(int argc, userptr_t argv, userptr_t env,
 
 int sys_reboot(int code);
 int sys___time(userptr_t user_seconds, userptr_t user_nanoseconds);
-int sys___write(volatile int fd, userptr_t buffer,volatile size_t len);
+int sys___write(int fd, userptr_t buffer,size_t len,int32_t* retval);
+int sys___open(userptr_t filename, int flags,int32_t* retval);
+int sys___close(int fd);
+int sys___read(int fd, userptr_t buffer,size_t len,int32_t* retval);
+int sys___lseek(int fd, off_t offset,int whence,int32_t* retval,int32_t* retval1);
+int sys___fork(struct trapframe *tf,int32_t* retval);
+int sys___getPID(int32_t* retval);
+int sys___waitPID(pid_t pid,userptr_t status,int options,int32_t* retval);
+void sys___exit(int exitcode);
+int sys___chdir(userptr_t dirpath);
+int sys___dup2(int ofd, int dfd,int32_t* retval);
+int sys____getcwd(userptr_t buffer,size_t len,int32_t* retval);
+int sys___execv(userptr_t progname, userptr_t args);
 #endif /* _SYSCALL_H_ */
+

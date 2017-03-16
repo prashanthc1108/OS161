@@ -97,6 +97,7 @@ struct trapframe {
  * be on the thread's own stack or bad things will happen.
  */
 __DEAD void mips_usermode(struct trapframe *tf);
+void copyTF(struct trapframe *tf1,struct trapframe **tf2);
 
 /*
  * Arrays used to load the kernel stack and curthread on trap entry.

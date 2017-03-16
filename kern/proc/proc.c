@@ -48,7 +48,9 @@
 #include <current.h>
 #include <addrspace.h>
 #include <vnode.h>
-
+#include <filetable.h>
+#include <proctable.h>
+#include <kern/errno.h>
 /*
  * The process for the kernel; this holds all the kernel-only threads.
  */
@@ -73,6 +75,13 @@ proc_create(const char *name)
 		return NULL;
 	}
 
+	proc->pidsem = sem_create("pidsem", 0);
+	if(proc->pidsem==NULL)
+		{
+		kfree(proc);
+                return NULL;
+		}
+
 	proc->p_numthreads = 0;
 	spinlock_init(&proc->p_lock);
 
@@ -82,6 +91,36 @@ proc_create(const char *name)
 	/* VFS fields */
 	proc->p_cwd = NULL;
 
+
+	//creating the new filetable
+	proc->ftab = createFileTable();	
+	if(proc->ftab==NULL)
+		{
+		kfree(proc);
+                return NULL;
+		}
+	
+/*	proc->kernBuff = (char**)kmalloc(sizeof (char *));
+	if(proc->kernBuff==NULL)
+                {
+                kfree(proc);
+                return NULL;
+                }
+	proc->argLen =(size_t**)kmalloc(sizeof(size_t *));
+	if(proc->argLen==NULL)
+                {
+                kfree(proc);
+                return NULL;
+                }
+*/
+	(void)processtable;
+	proc->PID = getPID(proc);
+	if(strcmp(proc->p_name,"[kernel]")==0)
+		proc->PPID = 2;
+	else
+		proc->PPID = curproc->PID;
+
+//	proc->argsCount = 0;
 	return proc;
 }
 
@@ -178,6 +217,8 @@ proc_destroy(struct proc *proc)
 void
 proc_bootstrap(void)
 {
+	initializeproctable();
+	initializekernbuffer();
 	kproc = proc_create("[kernel]");
 	if (kproc == NULL) {
 		panic("proc_create for kproc failed\n");
@@ -317,4 +358,43 @@ proc_setas(struct addrspace *newas)
 	proc->p_addrspace = newas;
 	spinlock_release(&proc->p_lock);
 	return oldas;
+}
+
+
+struct proc *create_new_proc(const char *name,int32_t* retval)
+{
+struct proc *newproc;
+lock_acquire(processtable->proclock);
+        newproc = proc_create(name);
+lock_release(processtable->proclock);
+        if (newproc == NULL) {
+	*retval = ENOMEM;         
+       return NULL;
+        }
+        if(newproc->PID==-1)
+		{
+			kfree(newproc);
+			*retval=ENPROC;
+			return NULL;
+		}
+        /* VM fields */
+
+        newproc->p_addrspace = NULL;
+
+        /* VFS fields */
+
+        /*
+         * Lock the current process to copy its current directory.
+         * (We don't need to lock the new process, though, as we have
+         * the only reference to it.)
+         */
+        spinlock_acquire(&curproc->p_lock);
+        if (curproc->p_cwd != NULL) {
+                VOP_INCREF(curproc->p_cwd);
+                newproc->p_cwd = curproc->p_cwd;
+        }
+        spinlock_release(&curproc->p_lock);
+	*retval = 0;
+        return newproc;
+	
 }
