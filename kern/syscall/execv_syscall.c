@@ -11,14 +11,16 @@
 #include <test.h>
 #include <limits.h>
 #include <copyinout.h>
-#include <proctable.h>
+//#include <proctable.h>
 #include <synch.h>
 
-
-
+char* kernbuffer;
+//int kernelcount;
+int len;
 int
 sys___execv(userptr_t progname, userptr_t args)
 {
+//	kernelcount = 0;
  	int result=0;
         char progpath[32];
 	size_t actual_len;
@@ -28,20 +30,24 @@ sys___execv(userptr_t progname, userptr_t args)
 	char prog[actual_len];
 	strcpy(prog,progpath);
 	
-	allocatebuff();
-
+//	allocatebuff();
+	if(kernbuffer==NULL)
+		kernbuffer=(char*)kmalloc(ARG_MAX);
 
 //	strcpy(kernbuff->args,"911");	
 //	char* curthread->t_proc->kernBuff[ARG_MAX];
 //	size_t* curthread->t_proc->argLen[ARG_MAX];
 	int count = 0;
-	char* delimiter = kmalloc(sizeof(char));
+//	char* delimiter = kmalloc(sizeof(char));
 	userptr_t* address;
 	size_t* temps;
-        strcpy(delimiter,"~");
+//        strcpy(delimiter,"~");
 	while(1)
 	{
-		concatenation(delimiter);
+//		concatenation(delimiter);
+		strcat(kernbuffer,"~");
+//		kernbuffer[kernelcount]='~';
+//		kernelcount++;
 		address = (userptr_t*)kmalloc(sizeof(userptr_t));
 		if(address==NULL)
 			return ENOMEM;
@@ -56,7 +62,7 @@ sys___execv(userptr_t progname, userptr_t args)
 		temps = (size_t*)kmalloc(sizeof(size_t));
 		if(temps==NULL)
 			return ENOMEM;
-		result = copyinstr(*address,kernbuff->args+strlen(kernbuff->args),ARG_MAX,temps);
+		result = copyinstr(*address,kernbuffer+strlen(kernbuffer),ARG_MAX,temps);
 		if(result==EFAULT)
 			return EFAULT;
 //		*kernbuff->len[count] = *temps;
@@ -70,6 +76,7 @@ sys___execv(userptr_t progname, userptr_t args)
 //		concatenation(delimiter);
 //		concatenation(temp);
 //		kfree(temp);
+//		kernelcount+=*temps-1;
 		kfree(temps);
 		kfree(address);
 		//kprintf("%s\n",curthread->t_proc->kernBuff[count]);
@@ -79,10 +86,10 @@ sys___execv(userptr_t progname, userptr_t args)
 		args=args+sizeof(struct userptr*);	
 	}
 
-	kernbuff->count = count;
-	kprintf("%d\n",kernbuff->count);
-	kprintf("%d\n",strlen(kernbuff->args));
-	kfree(delimiter);
+	len = count;
+	kprintf("%d\n",len);
+	kprintf("%d\n",strlen(kernbuffer));
+//	kfree(delimiter);
 	struct addrspace *as;
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
@@ -105,7 +112,7 @@ sys___execv(userptr_t progname, userptr_t args)
 	/* Switch to it and activate it. */
 	struct addrspace* oldas = proc_setas(as);
 	as_activate();
-	kfree(oldas);
+	as_destroy(oldas);
 
 
 	/* Load the executable. */
@@ -130,14 +137,14 @@ sys___execv(userptr_t progname, userptr_t args)
 
 	char* arg;
 //	char* context;
-	count = kernbuff->count;
+	count = len;
 	int i =0;
 	vaddr_t argptr[count];
 	char * context;
 //	kprintf("%s\n",kernbuff->args);
 	char* nulchar = kmalloc(sizeof(char));
 	strcpy(nulchar,"\0");
-	arg = strtok_r(kernbuff->args,"~",&context);
+	arg = strtok_r(kernbuffer,"~",&context);
 	while(arg!=NULL)
 	{
 		int length = strlen(arg);
@@ -175,7 +182,7 @@ sys___execv(userptr_t progname, userptr_t args)
 
 
 	
-	resetbuffer();
+	memset(kernbuffer,'\0',ARG_MAX);
 	/* Warp to user mode. */	
 	enter_new_process(count /*argc*/, (userptr_t)stackptr /*userspace addr of argv*/,
 			NULL /*userspace addr of environment*/,

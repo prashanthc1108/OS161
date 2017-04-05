@@ -36,18 +36,32 @@
  * You'll probably want to add stuff here.
  */
 
-
+#include <mainbus.h>
 #include <machine/vm.h>
 
 /* Fault-type arguments to vm_fault() */
 #define VM_FAULT_READ        0    /* A read was attempted */
 #define VM_FAULT_WRITE       1    /* A write was attempted */
 #define VM_FAULT_READONLY    2    /* A write to a readonly page was attempted*/
+#define PAGE_SIZE  4096
+#define FREE_STATE 0
+#define FIXED_STATE 1
+#define DIRTY_STATE 2
+#define CLEAN_STATE 3
 
-
+struct coremapentry
+{
+	unsigned int pagestate;
+	unsigned long chunksize;
+};
+struct lock* coremaplock;
+struct coremapentry * coremap;
+unsigned long usedpages;
+//int corenextfree = 0;
+unsigned long  totalnumberofpages;
 /* Initialization function */
 void vm_bootstrap(void);
-
+int IsInitialized;
 /* Fault handling function called by trap code */
 int vm_fault(int faulttype, vaddr_t faultaddress);
 

@@ -3,20 +3,20 @@
 #include<proctable.h>
 #include<current.h>
 #include <synch.h>
-
+/*
 
 void concatenation(char* w1)
 {
 //      char* w3 = kmalloc(strlen(w1)+strlen(w2)+1);
 //      strcpy(w3,w1);
-        strcat(kernbuff->args,w1);
+//        strcat(kernbuff->args,w1);
 }
 
 void resetbuffer()
 {
 
 
-memset(kernbuff->args,'\0',ARG_MAX);
+//memset(kernbuff->args,'\0',ARG_MAX);
 //	for (int i=0;i<4*PATH_MAX;i++)
   //              {
                // kfree(kernbuff->args);
@@ -29,14 +29,14 @@ memset(kernbuff->args,'\0',ARG_MAX);
 
 void allocatebuff()
 {
-	if(kernbuff->args==NULL)
-		kernbuff->args = kmalloc(ARG_MAX);
+//	if(kernbuff->args==NULL)
+//		kernbuff->args = kmalloc(ARG_MAX);
 }
 
 void initializekernbuffer()
 {
-        kernbuff =  kmalloc(sizeof(struct kernbuffer));
-	kernbuff->args = NULL;
+  //      kernbuff =  kmalloc(sizeof(struct kernbuffer));
+//	kernbuff->args = NULL;
 //	kernbuff->args=kmalloc(ARG_MAX);
 //        for (int i=0;i<4*PATH_MAX;i++)
 //		{
@@ -45,13 +45,14 @@ void initializekernbuffer()
 //		}
     //    kernbuff->bufflock=lock_create("buff_lock");
 }
-
+*/
 void initializeproctable()
 {
 	struct proctable* pt;
 	pt =  kmalloc(sizeof(struct proctable));
 	processtable = pt;
-        for (pid_t i=0;i<__PID_MAX;i++)
+	kprintf("\n%d\n",PID_MAX);
+        for (pid_t i=0;i<PID_MAX;i++)
                 processtable->pt[i] = NULL;
 	processtable->proclock=lock_create("proc_lock");
 }
@@ -59,12 +60,12 @@ void initializeproctable()
 pid_t getPID(struct proc* p)
 {
 	pid_t i;
-	for (i=2;i<__PID_MAX;i++) 
+	for (i=2;i<PID_MAX;i++) 
 	{
                 if(processtable->pt[i]==NULL)
 		break;
 	}
-	if(i==__PID_MAX)
+	if(i==PID_MAX)
 		return -1;
 	processtable->pt[i] = p;
 	return i;

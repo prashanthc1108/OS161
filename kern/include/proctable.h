@@ -7,9 +7,9 @@
 struct proctable
 {
 	struct lock* proclock;
-        struct proc* pt[__PID_MAX];
+        struct proc* pt[PID_MAX];
 };
-
+/*
 struct kernbuffer
 {
 //	struct lock* bufflock;
@@ -21,7 +21,7 @@ void allocatebuff(void);
 void concatenation(char* w1);
 void resetbuffer(void);
 void initializekernbuffer(void);
-struct kernbuffer* kernbuff;
+struct kernbuffer* kernbuff;*/
 struct proctable*  processtable;
 struct proc* getprocessforPID(pid_t pid);
 void initializeproctable(void); 

@@ -31,13 +31,12 @@
 #include <lib.h>
 #include <vm.h>
 #include <mainbus.h>
-
+#include <synch.h>
 
 vaddr_t firstfree;   /* first free virtual address; set by start.S */
 
 static paddr_t firstpaddr;  /* address of first free physical page */
 static paddr_t lastpaddr;   /* one past end of last free physical page */
-
 /*
  * Called very early in system boot to figure out how much physical
  * RAM is available.
@@ -71,6 +70,40 @@ ram_bootstrap(void)
 
 	kprintf("%uk physical memory available\n",
 		(lastpaddr-firstpaddr)/1024);
+	
+
+	unsigned long  totalpagessofar = firstpaddr/PAGE_SIZE;
+	totalnumberofpages = ramsize/PAGE_SIZE;
+	int totalbytes = totalnumberofpages*sizeof(struct coremapentry);
+	
+	coremap = (void *)firstpaddr+MIPS_KSEG0;
+	unsigned long  i=0;
+	for (;i<totalpagessofar;i++)
+	{
+		coremap[i].pagestate = FIXED_STATE;
+		coremap[i].chunksize = 1;
+	}
+	unsigned long corepages = totalbytes/PAGE_SIZE;
+	if(totalbytes%PAGE_SIZE!=0)
+		corepages+=1;
+	totalpagessofar = totalpagessofar+corepages;
+	unsigned long  firstcoremappage = i;
+	for (;i<totalpagessofar;i++)
+        {
+		coremap[i].pagestate = FIXED_STATE;
+		coremap[i].chunksize = 1;
+        }
+	coremap[firstcoremappage].chunksize = corepages;
+	usedpages = totalpagessofar;
+	for(;i<totalnumberofpages;i++)
+	{
+		coremap[i].pagestate = FREE_STATE;
+		coremap[i].chunksize = 0;
+	}
+	IsInitialized=0;
+	coremaplock = lock_create("coremaplock");	
+	kprintf("%uk physical memory available after coremap initialization\n",
+                (lastpaddr-firstpaddr)/1024);
 }
 
 /*
@@ -94,6 +127,7 @@ ram_bootstrap(void)
 paddr_t
 ram_stealmem(unsigned long npages)
 {
+
 	size_t size;
 	paddr_t paddr;
 
@@ -105,7 +139,52 @@ ram_stealmem(unsigned long npages)
 
 	paddr = firstpaddr;
 	firstpaddr += size;
+/*	unsigned long coremapindex = firstpaddr/PAGE_SIZE;
+	unsigned long coremapendindex = coremapindex+npages;
+	firstpaddr += size;
+	for(unsigned long i=coremapindex;i<coremapendindex;i++)
+        {       
+        coremap[i].pagestate = FIXED_STATE;
+        coremap[i].chunksize = 0;       
+        }
+	coremap[coremapindex].chunksize = npages;
+*/
+/*
+	unsigned long i=0;
+	paddr_t paddr;
+	for(;i<totalnumberofpages;i++)
+        {
+                if(coremap[i].pagestate == FREE_STATE)
+			{
+				bool isValid = false;
+				if(i+npages<totalnumberofpages)
+				{
+				unsigned long  j=0;
+				for(;j<npages;j++)
+				{
+				if(coremap[i+j].pagestate != FREE_STATE)
+					break;	
+				}
+				if(j==npages)
+					isValid = true;
+				}
+				if(isValid)
+					break;
+			}
+        }
+	if(i==totalnumberofpages)
+		return 0;
+	unsigned long begin = i;
+	unsigned long end = begin + npages;  
+	for(;i<end;i++)
+	{	
+	coremap[i].pagestate = FIXED_STATE;
+	coremap[i].chunksize = 0;	
+	}
+	coremap[begin].chunksize = npages;
+	paddr = begin*PAGE_SIZE; 
 
+*/
 	return paddr;
 }
 
