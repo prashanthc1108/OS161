@@ -10,6 +10,7 @@
 #include <thread.h>
 #include <cpu.h>
 #include <kern/errno.h>
+#include <proctable.h>
 
 struct filetable* createFileTable()
 {	
@@ -47,31 +48,6 @@ int isfdvalid(int fd,int openflags)
 			return EBADF;
 		}
         }
-
-/*	if(fd>=0&&fd<MAX_FT)
-		{
-		 fh =curthread->t_proc->ftab->ft[fd];
-                if(fh!=NULL)
-                {
-                        if(openflags==O_RDONLY)
-                        {
-				if((fh->flag&1)!=0)
-                                	return EBADF;
-                        }
-                        if(openflags==O_WRONLY)
-                        {
-				if((fh->flag&1)==0)
-                                        return EBADF;
-                        }
-                        return 0;       
-                }
-                else
-                {
-                        return EBADF;
-                }
-
-		}
-*/
 	return EBADF;
 }
 
@@ -84,17 +60,6 @@ int getfd(char *path, int openflags,int* ret)
 {
 	int len = MAX_FT;
 	struct mfilehandle* fh;
-/*	for (int i=3;i<len;i++)
-	{
-		fh =curthread->t_proc->ftab->ft[i];
-		if(fh == NULL)
-			continue;
-		if(strcmp(fh->path, path)==0 && fh->flag==openflags)
-		{
-			return i;
-			fh->refcount++;
-		}
-	}*/
 	struct mfilehandle* new_fh =  getfilehandle(path,openflags,ret);
 	if(new_fh == NULL)
 	{
@@ -115,60 +80,52 @@ int getfd(char *path, int openflags,int* ret)
 int closefd(int fd)
 {
 	struct mfilehandle* fh;
-/*	for (int i=0;i<MAX_FT;i++)
-        {
-                fh =curthread->t_proc->ftab->ft[i];
-                if(fh == NULL)
-		{	
-			if(i==fd)
-                        	return EBADF;
-			else
-				continue;
-                }
-		else
-		{
-			if(i==fd)
-				{
-				curthread->t_proc->ftab->ft[i]->refcount--;			
-				if(curthread->t_proc->ftab->ft[i]->refcount==0)
-				{
-					vfs_close(curthread->t_proc->ftab->ft[i]->v_node);
-					//TO DO clean up mfilehandle
-				}
-				curthread->t_proc->ftab->ft[i]=NULL;	
-				return 0;
-				}
-		}
-        }
-	return EBADF;
-*/
 	fh =curthread->t_proc->ftab->ft[fd];
 	if(fh==NULL)
+	{
 		return EBADF;
+	
+	}
 	else
 	{
 		fh->refcount--;
 		if(fh->refcount==0)
                    {
-                       vfs_close(curthread->t_proc->ftab->ft[fd]->v_node);
+                       vfs_close(fh->v_node);
                                         //TO DO clean up mfilehandle
-			   
-                 }
+/*			lock_destroy(fh->handlelock);
+			kfree(fh);
+*/
+			 }
 		curthread->t_proc->ftab->ft[fd] = NULL;
 		return  0;
 	}
 }
 
+void deleteFT(struct filetable* ftab)
+{
+/*	for (int i=3;i<MAX_FT;i++)
+	{
+
+		if(ftab->ft[i]!=NULL){
+			closefd(i);
+		}
+	}
+*/
+	kfree(ftab);
+
+}
+
+
+
 void copyft(struct filetable* ft1,struct filetable* ft2)
 {
-//	struct filetable* newft = createFileTable(); 
 	for (int i=0;i<MAX_FT;i++)
 	{
 		ft2->ft[i]=ft1->ft[i];	
 		if(ft1->ft[i]!=NULL)
 			ft1->ft[i]->refcount++;
 	}
-//	*ft2 = newft;
 }
 
 
@@ -205,16 +162,6 @@ int clonefd(int ofd, int dfd){
 	if(curthread->t_proc->ftab->ft[dfd]!=NULL){
 		closefd(dfd);
 	}
-/*	struct mfilehandle* dupfh;
-	struct mfilehandle* origfh = curthread->t_proc->ftab->ft[ofd];
-	dupfh = kmalloc(sizeof(struct mfilehandle));
-	strcpy(dupfh->path,origfh->path);
-	dupfh->flag = origfh->flag;
-	dupfh->offset = origfh->offset;
-	dupfh->v_node = origfh->v_node;
-	dupfh->refcount = origfh->refcount;
-	curthread->t_proc->ftab->ft[dfd]=dupfh;
-*/
 	curthread->t_proc->ftab->ft[dfd] = curthread->t_proc->ftab->ft[ofd];
 	curthread->t_proc->ftab->ft[dfd]->refcount++;
 	return 0;

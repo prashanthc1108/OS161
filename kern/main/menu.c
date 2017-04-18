@@ -49,6 +49,7 @@
 #include "opt-synchprobs.h"
 #include "opt-automationtest.h"
 #include <filetable.h>
+#include <vm.h>
 /*
  * In-kernel menu and command dispatcher.
  */
@@ -88,8 +89,9 @@ cmd_progthread(void *ptr, unsigned long nargs)
 
 	/* Hope we fit. */
 	KASSERT(strlen(args[0]) < sizeof(progname));
-	setstdfilehandle();	
+		setstdfilehandle();	
 	strcpy(progname, args[0]);
+//	kprintf("\n%lu\n%lu\n",usedpages,totalnumberofpages);
 	result = runprogram(progname);
 	if (result) {
 		kprintf("Running program %s failed: %s\n", args[0],
@@ -119,7 +121,6 @@ common_prog(int nargs, char **args)
 	struct proc *proc;
 	int result;
 	unsigned tc;
-
 	/* Create a process for the new program to run in. */
 	proc = proc_create_runprogram(args[0] /* name */);
 	if (proc == NULL) {
@@ -146,7 +147,8 @@ common_prog(int nargs, char **args)
 	// Wait for all threads to finish cleanup, otherwise khu be a bit behind,
 	// especially once swapping is enabled.
 	thread_wait_for_count(tc);
-
+	proc_destroy(proc);
+	// kprintf("\n%lu\n%lu\n",usedpages,totalnumberofpages);
 	return 0;
 }
 

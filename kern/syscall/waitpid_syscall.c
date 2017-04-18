@@ -22,15 +22,24 @@ int sys___waitPID(pid_t pid,userptr_t status,int options,int32_t* retval)
 	{
         result = copyin(status,dest,sizeof(*dest));
         if(result==EFAULT)
+		{
+		kfree(dest);
                 return EFAULT;
+		}
 	}
 	lock_acquire(processtable->proclock);
 	struct proc* nproc =  getprocessforPID(pid);
 	lock_release(processtable->proclock);
 	if(nproc==NULL)
+		{
+		kfree(dest);
 		return ESRCH;
+		}
 	if(nproc->PPID!=curthread->t_proc->PID)
+		{
+		kfree(dest);
 		return ECHILD;
+		}
 	P(nproc->pidsem);
 	*retval = pid;
 	*dest = nproc->exitstatus;
@@ -38,8 +47,12 @@ int sys___waitPID(pid_t pid,userptr_t status,int options,int32_t* retval)
 	{
 	result = copyout(dest, status, sizeof(*dest));
 	if(result==EFAULT)
+		{
+		kfree(dest);
                 return EFAULT;
+		}
 	}
+	kfree(dest);
 	lock_acquire(processtable->proclock);
 	deleteprocess(pid);
 	lock_release(processtable->proclock);

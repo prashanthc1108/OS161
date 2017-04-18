@@ -14,82 +14,80 @@
 //#include <proctable.h>
 #include <synch.h>
 
-char* kernbuffer;
+static char kernbuffer[ARG_MAX];
 //int kernelcount;
 int len;
 int
 sys___execv(userptr_t progname, userptr_t args)
 {
-//	kernelcount = 0;
  	int result=0;
-        char progpath[32];
+	userptr_t arg1 =args;
+        char* progpath=kmalloc(PATH_MAX);
 	size_t actual_len;
         result = copyinstr(progname,progpath,PATH_MAX,&actual_len);
 	if(result==EFAULT)
+		{
+		kfree(progpath);
                 return EFAULT;
-	char prog[actual_len];
+		}
+	char* prog=kmalloc(actual_len);
+	if(prog==NULL)
+                {
+                kfree(progpath);
+                return ENOMEM;
+                }
 	strcpy(prog,progpath);
-	
-//	allocatebuff();
-	if(kernbuffer==NULL)
-		kernbuffer=(char*)kmalloc(ARG_MAX);
-
-//	strcpy(kernbuff->args,"911");	
-//	char* curthread->t_proc->kernBuff[ARG_MAX];
-//	size_t* curthread->t_proc->argLen[ARG_MAX];
+	kfree(progpath);	
 	int count = 0;
-//	char* delimiter = kmalloc(sizeof(char));
 	userptr_t* address;
+	address = (userptr_t*)kmalloc(sizeof(userptr_t));
+	if(address==NULL)
+		{
+		kfree(prog);
+		return ENOMEM;
+		}
 	size_t* temps;
-//        strcpy(delimiter,"~");
+	temps = (size_t*)kmalloc(sizeof(size_t));
+	if(temps==NULL)
+		{
+		kfree(progpath);
+		kfree(address);
+		return ENOMEM;
+		}
+	int curpos = 0;
 	while(1)
 	{
-//		concatenation(delimiter);
-		strcat(kernbuffer,"~");
-//		kernbuffer[kernelcount]='~';
-//		kernelcount++;
-		address = (userptr_t*)kmalloc(sizeof(userptr_t));
-		if(address==NULL)
-			return ENOMEM;
-		result = copyin(args,address,sizeof(userptr_t));	
+	//	strcat(kernbuffer,"~");
+		kernbuffer[curpos] = '~';
+		curpos++;
+		result = copyin(arg1,address,sizeof(userptr_t));	
 		if(result==EFAULT)
+			{
+			 kfree(progpath);
+               		 kfree(address);
+			kfree(temps);	
 			return EFAULT;
+			}
 		if(*address==NULL)
 			break;
-//		char* temp = (char*)kmalloc(sizeof(char)*ARG_MAX);
-//		if(temp==NULL)
-//			return ENOMEM;
-		temps = (size_t*)kmalloc(sizeof(size_t));
-		if(temps==NULL)
-			return ENOMEM;
-		result = copyinstr(*address,kernbuffer+strlen(kernbuffer),ARG_MAX,temps);
+		result = copyinstr(*address,kernbuffer+curpos,ARG_MAX,temps);
 		if(result==EFAULT)
+			{
+                         kfree(progpath);
+                         kfree(address);
+                        kfree(temps);
 			return EFAULT;
-//		*kernbuff->len[count] = *temps;
-//		if(kernbuff->args[count]!=NULL)
-//			kfree(kernbuff->args[count]);
-//		kernbuff->args[count] = (char*)kmalloc(sizeof(char)*(*temps)); 
-
-//		char* w1 = kmalloc(*temps);	
-
-//		strcpy(w1,temp);		
-//		concatenation(delimiter);
-//		concatenation(temp);
-//		kfree(temp);
-//		kernelcount+=*temps-1;
-		kfree(temps);
-		kfree(address);
-		//kprintf("%s\n",curthread->t_proc->kernBuff[count]);
-		//kprintf("%d\n",*curthread->t_proc->argLen[count]);
+			}
+		curpos+=*temps-1;
 		count++;
-//		kprintf("%d\n",count);
-		args=args+sizeof(struct userptr*);	
+		arg1=arg1+sizeof(struct userptr*);	
 	}
 
+	kfree(temps);
+	kfree(address);
 	len = count;
 	kprintf("%d\n",len);
-	kprintf("%d\n",strlen(kernbuffer));
-//	kfree(delimiter);
+	kprintf("%d\n",curpos);
 	struct addrspace *as;
 	struct vnode *v;
 	vaddr_t entrypoint, stackptr;
@@ -97,9 +95,10 @@ sys___execv(userptr_t progname, userptr_t args)
 /* Open the file. */
 	result = vfs_open(prog, O_RDONLY, 0, &v);
 	if (result) {
+		kfree(prog);
 		return result;
 	}
-
+	kfree(prog);
 	/* We should be a new process. */
 //	KASSERT(proc_getas() == NULL);
 
@@ -111,8 +110,8 @@ sys___execv(userptr_t progname, userptr_t args)
 	}
 	/* Switch to it and activate it. */
 	struct addrspace* oldas = proc_setas(as);
-	as_activate();
 	as_destroy(oldas);
+	as_activate();
 
 
 	/* Load the executable. */
@@ -139,7 +138,7 @@ sys___execv(userptr_t progname, userptr_t args)
 //	char* context;
 	count = len;
 	int i =0;
-	vaddr_t argptr[count];
+	vaddr_t* argptr = kmalloc(sizeof(vaddr_t)*count);
 	char * context;
 //	kprintf("%s\n",kernbuff->args);
 	char* nulchar = kmalloc(sizeof(char));
@@ -153,15 +152,17 @@ sys___execv(userptr_t progname, userptr_t args)
 			//stackptr --;
 			stackptr -= sizeof(char);
 			//stackptr = (userptr_t *)"\0";
+			//memmove(nulchar,(userptr_t)stackptr,sizeof(char));
 			copyout(nulchar,(userptr_t)stackptr,sizeof(char));
 		}
 		for(int k=length-1;k>=0;k--){
 			//stackptr --;
 			stackptr -= sizeof(char);
 			//memcpy(stackptr,curthread->t_proc->kernBuff[i]+k,sizeof(char));
+			//memmove(arg+k,(userptr_t)stackptr,sizeof(char));
 			copyout(arg+k,(userptr_t)stackptr,sizeof(char));
 		}
-		argptr[i]=stackptr;
+		*(argptr+i)=stackptr;
 		i++;
 		arg = strtok_r(NULL,"~",&context);
 //		kprintf("%d\n",i);
@@ -171,17 +172,19 @@ sys___execv(userptr_t progname, userptr_t args)
 	stackptr -= sizeof(vaddr_t);
 	//stackptr = kmalloc(sizeof(vaddr_t));
 	//memcpy(stackptr,"\0\0\0\0",sizeof(vaddr_t));
+	//memmove("\0\0\0\0",(userptr_t)stackptr,sizeof(vaddr_t));
 	copyout("\0\0\0\0",(userptr_t)stackptr,sizeof(vaddr_t));
 	
 	for(int i = count-1; i>=0; i--){
 		stackptr -= sizeof(vaddr_t);
 		//stackptr = kmalloc(sizeof(vaddr_t));
 		//memcpy(stackptr,argptr[i],sizeof(vaddr_t));
-		copyout(&argptr[i],(userptr_t)stackptr,sizeof(vaddr_t));
+//		memmove(&argptr[i],(userptr_t)stackptr,sizeof(vaddr_t));
+		copyout(argptr+i,(userptr_t)stackptr,sizeof(vaddr_t));
 	}
 
-
-	
+	kfree(argptr);
+	kfree(nulchar);
 	memset(kernbuffer,'\0',ARG_MAX);
 	/* Warp to user mode. */	
 	enter_new_process(count /*argc*/, (userptr_t)stackptr /*userspace addr of argv*/,

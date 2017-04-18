@@ -71,5 +71,6 @@ int sys___chdir(userptr_t dirpath);
 int sys___dup2(int ofd, int dfd,int32_t* retval);
 int sys____getcwd(userptr_t buffer,size_t len,int32_t* retval);
 int sys___execv(userptr_t progname, userptr_t args);
+int sys___sbrk(intptr_t amount,int32_t* retval);
 #endif /* _SYSCALL_H_ */
 

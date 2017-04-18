@@ -65,7 +65,7 @@ proc_create(const char *name)
 {
 	struct proc *proc;
 
-	proc = kmalloc(sizeof(*proc));
+	proc = kmalloc(sizeof(struct proc));
 	if (proc == NULL) {
 		return NULL;
 	}
@@ -78,6 +78,7 @@ proc_create(const char *name)
 	proc->pidsem = sem_create("pidsem", 0);
 	if(proc->pidsem==NULL)
 		{
+		kfree(proc->p_name);
 		kfree(proc);
                 return NULL;
 		}
@@ -96,6 +97,8 @@ proc_create(const char *name)
 	proc->ftab = createFileTable();	
 	if(proc->ftab==NULL)
 		{
+		kfree(proc->p_name);
+		spinlock_cleanup(&proc->p_lock);
 		kfree(proc);
                 return NULL;
 		}
@@ -206,8 +209,11 @@ proc_destroy(struct proc *proc)
 
 	KASSERT(proc->p_numthreads == 0);
 	spinlock_cleanup(&proc->p_lock);
-
+	//MEMORY CLEAN UP NEEDED
 	kfree(proc->p_name);
+	sem_destroy(proc->pidsem);
+	kfree(proc->p_cwd);
+	deleteFT(proc->ftab);
 	kfree(proc);
 }
 
@@ -219,6 +225,7 @@ proc_bootstrap(void)
 {
 	initializeproctable();
 //	initializekernbuffer();
+//	initializestdfh();
 	kproc = proc_create("[kernel]");
 	if (kproc == NULL) {
 		panic("proc_create for kproc failed\n");

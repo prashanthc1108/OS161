@@ -20,11 +20,19 @@ int sys___fork(struct trapframe *tf,int32_t* retval)
 		return *retval;
 	*retval = as_copy(curthread->t_proc->p_addrspace, &newproc->p_addrspace);
 	if(*retval)
+		{
+//		kprintf("here\n");
+		proc_destroy(newproc);
 		return *retval;
+		}
 	copyft(curthread->t_proc->ftab,newproc->ftab);
 	struct trapframe* newtf = (struct trapframe*)kmalloc(sizeof(struct trapframe));
 	if(newtf==NULL)
+	{
+		kprintf("here\n");
+		proc_destroy(newproc);
 		return ENOMEM;
+	}
 	*newtf = *tf;
 	*retval = newproc->PID;
 	thread_fork("childthread",newproc,enter_forked_process,newtf,0);

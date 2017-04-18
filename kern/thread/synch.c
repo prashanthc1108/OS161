@@ -203,7 +203,7 @@ lock_acquire(struct lock *lock)
 
 	KASSERT(lock != NULL);
 //TO DO  commented line below to pass km2. why????
-//	KASSERT(curthread->t_in_interrupt == false);
+	KASSERT(curthread->t_in_interrupt == false);
 	
 	spinlock_acquire(&lock->lk_lock);
 	while (lock->is_acquired == true) {

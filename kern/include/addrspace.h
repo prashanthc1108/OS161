@@ -40,6 +40,11 @@
 
 struct vnode;
 
+struct segment{
+	vaddr_t as_vbase;
+        size_t as_npages;
+	struct segment* nextseg;
+};
 
 /*
  * Address space - data structure associated with the virtual memory
@@ -59,6 +64,15 @@ struct addrspace {
         paddr_t as_stackpbase;
 #else
         /* Put stuff here for your VM system */
+	//As of now I think statically sized segments need a base and a bound,
+	// while dynamic segments just need the start address.
+	
+	struct segment* segments;
+	size_t cur_stackpages;
+	vaddr_t as_heapvbase;
+	size_t cur_heappages;
+	struct node* head;
+	struct node* tail;	
 #endif
 };
 

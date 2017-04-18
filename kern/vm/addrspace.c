@@ -33,6 +33,27 @@
 #include <addrspace.h>
 #include <vm.h>
 #include <proc.h>
+#include <spl.h>
+#include <cpu.h>
+#include <spinlock.h>
+#include <current.h>
+#include <mips/tlb.h>
+#include <pagetable.h>
+
+
+//has to be changed
+#define STACK_TEMP_VALUE    801
+#define TEMP_VALUE    0
+#define STACK_SIZE 4096
+/*
+static
+void
+as_zero_region(paddr_t paddr, unsigned npages)
+{
+        bzero((void *)PADDR_TO_KVADDR(paddr), npages * PAGE_SIZE);
+}
+
+*/
 
 /*
  * Note! If OPT_DUMBVM is set, as is the case until you start the VM
@@ -40,41 +61,130 @@
  * used. The cheesy hack versions in dumbvm.c are used instead.
  */
 
+
+static void deletesegs(struct addrspace *as)
+{
+	struct segment* temp = as->segments;
+        while(temp!=NULL)
+        {
+                struct segment* prev = temp;
+                temp=temp->nextseg;
+                kfree(prev);
+        }
+
+}
+
+static void deletevandppages(struct addrspace *as)
+{
+	struct node* newtemp = as->head;
+        while(newtemp!=NULL&&newtemp->ptentry!=NULL)
+        {
+                struct node* prev = newtemp;
+                unsigned pageno = getpageno(prev->ptentry->paddr);
+                freeppages(pageno);
+                newtemp=newtemp->next;
+		kfree(prev->ptentry);
+                kfree(prev);
+        }
+
+}
 struct addrspace *
 as_create(void)
 {
-	struct addrspace *as;
-
-	as = kmalloc(sizeof(struct addrspace));
-	if (as == NULL) {
-		return NULL;
-	}
-
-	/*
-	 * Initialize as needed.
-	 */
-
+	struct addrspace *as = kmalloc(sizeof(struct addrspace));
+        if (as==NULL) {
+                return NULL;
+        }
+	as->segments = NULL;
+	as->head = initializepagetable();        
+	as->tail = as->head;
 	return as;
+
 }
 
+static
+void
+vm_can_sleep(void)
+{
+        if (CURCPU_EXISTS()) {
+                /* must not hold spinlocks */
+                KASSERT(curcpu->c_spinlocks == 0);
+
+                /* must not be in an interrupt handler */
+                KASSERT(curthread->t_in_interrupt == 0);
+        }
+}
 int
 as_copy(struct addrspace *old, struct addrspace **ret)
 {
-	struct addrspace *newas;
+	struct addrspace *new;
 
-	newas = as_create();
-	if (newas==NULL) {
+        vm_can_sleep();
+
+        new = as_create();
+        if (new==NULL) {
+                return ENOMEM;
+        }
+        
+	struct segment* temp = old->segments;
+	new->segments = kmalloc(sizeof(struct segment));
+        struct segment* newtemp = new->segments;
+	newtemp->nextseg = NULL;
+	if (newtemp==NULL) {
+		//MEMLEAK???
 		return ENOMEM;
 	}
+	while(temp!=NULL)
+		{
+			newtemp->as_vbase = temp->as_vbase;
+			newtemp->as_npages = temp->as_npages;
+			temp=temp->nextseg;
+			if(temp!=NULL)
+			{
+				newtemp->nextseg = kmalloc(sizeof(struct segment));
+				if (newtemp->nextseg==NULL) {
+         		       //MEMLEAK???
+				deletesegs(new);		
+                		return ENOMEM; 
+        			}
+				newtemp->nextseg->nextseg=NULL;
+			newtemp = newtemp->nextseg;
+			}	
+		}
 
-	/*
-	 * Write this.
-	 */
+		new->cur_stackpages = old->cur_stackpages;
+		new->as_heapvbase = old->as_heapvbase;
+		new->cur_heappages = old->cur_heappages;
 
-	(void)old;
 
-	*ret = newas;
-	return 0;
+	struct node* tempnode = old->head;
+	struct node* newtempnode = new->head;
+	while(tempnode!=old->tail)
+	{
+		paddr_t paddr = getppages(1);
+		 if (paddr == 0)
+			{
+			deletesegs(new); 
+			deletevandppages(new);
+                        return ENOMEM;
+			}
+		new->tail = addpagetableentries(tempnode->ptentry->vaddr,paddr,new->tail);
+		if(new->tail==NULL)
+			{
+			deletesegs(new);
+                        deletevandppages(new);
+			return ENOMEM;
+			}
+		memmove((void *)PADDR_TO_KVADDR(newtempnode->ptentry->paddr),
+                (const void *)PADDR_TO_KVADDR(tempnode->ptentry->paddr),
+                PAGE_SIZE);
+		tempnode = tempnode->next;
+		newtempnode = newtempnode->next;
+	}
+
+        *ret = new;
+        return 0;
+
 }
 
 void
@@ -83,27 +193,50 @@ as_destroy(struct addrspace *as)
 	/*
 	 * Clean up as needed.
 	 */
-
+	vm_can_sleep();
+/*	struct segment* temp = as->segments;
+        while(temp!=NULL)
+        {
+		struct segment* prev = temp;
+                temp=temp->nextseg;
+        	kfree(prev);
+	}
+*/
+	deletesegs(as);
+/*
+	struct node* newtemp = as->head;
+	while(newtemp!=NULL&&newtemp->ptentry!=NULL)
+	{
+		struct node* prev = newtemp;
+		unsigned pageno = getpageno(prev->ptentry->paddr);
+		freeppages(pageno);
+		newtemp=newtemp->next;
+		kfree(prev);
+	}*/
+	deletevandppages(as);
 	kfree(as);
 }
 
 void
 as_activate(void)
 {
-	struct addrspace *as;
+	int i, spl;
+        struct addrspace *as;
+        
+        as = proc_getas();
+        if (as == NULL) {
+                return;
+        }
+        
+        /* Disable interrupts on this CPU while frobbing the TLB. */
+        spl = splhigh();
+        
+        for (i=0; i<NUM_TLB; i++) {
+                tlb_write(TLBHI_INVALID(i), TLBLO_INVALID(), i);
+        }
+        
+        splx(spl);
 
-	as = proc_getas();
-	if (as == NULL) {
-		/*
-		 * Kernel thread without an address space; leave the
-		 * prior address space in place.
-		 */
-		return;
-	}
-
-	/*
-	 * Write this.
-	 */
 }
 
 void
@@ -115,6 +248,8 @@ as_deactivate(void)
 	 * be needed.
 	 */
 }
+
+
 
 /*
  * Set up a segment at virtual address VADDR of size MEMSIZE. The
@@ -133,14 +268,47 @@ as_define_region(struct addrspace *as, vaddr_t vaddr, size_t memsize,
 	/*
 	 * Write this.
 	 */
-
-	(void)as;
-	(void)vaddr;
-	(void)memsize;
+	size_t npages;
+        
+        vm_can_sleep();
+        
+        /* Align the region. First, the base... */
+        memsize += vaddr & ~(vaddr_t)PAGE_FRAME;
+        vaddr &= PAGE_FRAME;
+        
+        /* ...and now the length. */
+        memsize = (memsize + PAGE_SIZE - 1) & PAGE_FRAME;
+        
+        npages = memsize / PAGE_SIZE;
+	
 	(void)readable;
 	(void)writeable;
 	(void)executable;
-	return ENOSYS;
+	
+
+	struct segment* temp = as->segments;
+	struct segment* prev = temp;
+	while(temp!=NULL)
+	{
+		prev = temp;
+		temp=temp->nextseg;	
+	}
+	if(prev==NULL)
+	{
+	as->segments = kmalloc(sizeof(struct segment));
+	as->segments->as_vbase = vaddr;
+	as->segments->as_npages = npages;
+	as->segments->nextseg=NULL;
+	}
+	else
+	{
+	prev->nextseg = kmalloc(sizeof(struct segment));
+	prev->nextseg->as_vbase = vaddr;
+        prev->nextseg->as_npages = npages;
+	prev->nextseg->nextseg = NULL;
+	}
+	return 0;
+
 }
 
 int
@@ -150,8 +318,57 @@ as_prepare_load(struct addrspace *as)
 	 * Write this.
 	 */
 
+	struct segment* temp = as->segments;
+        struct segment* prev = temp;
+	
+	while(temp!=NULL)
+        {
+        	vm_can_sleep();
+//		kprintf("\n%lu\n%lu\n%d\n",usedpages,totalnumberofpages,temp->as_npages);
+//        	paddr_t padd = getppages(temp->as_npages);
+        	//MEMLEAK??
+//		if (padd == 0) 
+//                	return ENOMEM;
+//                as->tail = addpagetableentries(temp->as_vbase,padd,as->tail);
+		if(prev->as_vbase<temp->as_vbase)
+			prev = temp;
+//		as_zero_region(padd, temp->as_npages);
+		temp=temp->nextseg;
+        }
+/*        
+	//Has to be changed
+	paddr_t paddr = getppages(TEMP_VALUE);
+        //MEMLEAK??
+	if (paddr == 0) {
+                return ENOMEM;
+        }
+
+	as->tail = addpagetableentries(USERSTACK-(STACK_SIZE*TEMP_VALUE),paddr,as->tail);
+        as_zero_region(paddr, TEMP_VALUE);
+	as->cur_stackpages = TEMP_VALUE;
+
+	//Has to be changed
+	int pageno = prev->as_vbase/PAGE_SIZE-1;
+        int heappageno = pageno + prev->as_npages+1;
+	as->as_heapvbase = heappageno*PAGE_SIZE;
+	paddr = getppages(TEMP_VALUE);
+	if (paddr == 0) {
+                return ENOMEM;
+        }
+	
+	as->tail = addpagetableentries(as->as_heapvbase,paddr,as->tail);
+        as_zero_region(paddr, TEMP_VALUE);
+	as->cur_heappages = TEMP_VALUE;
+ 
 	(void)as;
+  */
+	as->cur_stackpages = STACK_TEMP_VALUE;
+	int pageno = prev->as_vbase/PAGE_SIZE-1;
+        int heappageno = pageno + prev->as_npages+1;
+        as->as_heapvbase = heappageno*PAGE_SIZE;
+	as->cur_heappages = TEMP_VALUE;
 	return 0;
+
 }
 
 int

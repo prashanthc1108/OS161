@@ -3,7 +3,6 @@
 #include<limits.h>
 #include <synch.h>
 
-
 struct proctable
 {
 	struct lock* proclock;

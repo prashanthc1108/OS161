@@ -51,7 +51,7 @@
 #include <kern/test161.h>
 #include <version.h>
 #include "autoconf.h"  // for pseudoconfig
-
+#include <filetable.h>
 
 /*
  * These two pieces of data are maintained by the makefiles and build system.
@@ -112,6 +112,7 @@ boot(void)
 	thread_bootstrap();
 	hardclock_bootstrap();
 	vfs_bootstrap();
+//	initializestdfh();
 	kheap_nextgeneration();
 
 	/* Probe and initialize devices. Interrupts should come on. */

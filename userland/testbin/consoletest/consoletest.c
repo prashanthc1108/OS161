@@ -77,8 +77,8 @@ main(int argc, char **argv)
 
 	(void) argc;
 	(void) argv;
-
-	int how_many, rv, i, len;
+	int rv;
+	int how_many, i, len;
 	char buffer[BUFFER_SIZE];
 
 	init_random();
@@ -97,6 +97,7 @@ main(int argc, char **argv)
 	}
 
 	// Insert a '\0' somewhere in the secured string to thwart kprintf attack.
+//	invalid_addr(0x1000000);
 	how_many = (random() % (len - 10)) + 5;
 	for (i = BUFFER_SIZE-1; i > how_many; i--) {
 		buffer[i] = buffer[i-1];

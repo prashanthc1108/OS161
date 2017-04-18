@@ -192,6 +192,7 @@ int
 main(void)
 {
 	initarray();
+//	printf("\ninitialized...");
 	sort(A, SIZE);
 	check();
 	return 0;

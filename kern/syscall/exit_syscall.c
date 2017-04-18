@@ -9,6 +9,7 @@
 #include <proc.h>
 #include <proctable.h>
 #include <kern/wait.h>
+#include <addrspace.h>
 
 void sys___exit(int exitcode)
 {
@@ -17,9 +18,20 @@ void sys___exit(int exitcode)
         lock_release(processtable->proclock);
         if(nproc==NULL)
                 return;
-        V(nproc->pidsem);
+/*	
+	if(nproc->PPID==2)
+	{
+		thread_exit();
+		proc_destroy(nproc);
+	}
+	else
+	{*/
 	nproc->exitstatus = _MKWAIT_EXIT(exitcode);
+        proc_remthread(curthread);
+	 V(nproc->pidsem);
 	thread_exit();
+	
+//	}
         return;
 }
 

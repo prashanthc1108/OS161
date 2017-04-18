@@ -60,6 +60,8 @@ main(void)
 	for (i=0; i<NumPages; i++) {
 		TEST161_LPROGRESS_N(i, PROGRESS_INTERVAL);
 		sparse[i][0]=i;
+//        tprintf("\n%d\n",i);
+
 	}
 
 	lsay("\nstage [1] done\n");
@@ -79,7 +81,7 @@ main(void)
 	for (i=NumPages-1; i>=0; i--) {
 		TEST161_LPROGRESS_N(i, PROGRESS_INTERVAL);
 		if (sparse[i][0]!=i+5) {
-			lsay("BAD NEWS!!! - your VM mechanism has a bug!\n");
+			lsay("BAD NEWS!!! - your VM mechanism has a bug!     %d   %d\n",sparse[i][0],i+5);
 			success(TEST161_FAIL, SECRET, "/testbin/huge");
 			exit(1);
 		}

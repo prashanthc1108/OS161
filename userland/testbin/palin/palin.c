@@ -175,10 +175,11 @@ int
 main(void)
 {
 	char *start, *end;
-
+/*
 	tprintf("Welcome to the palindrome tester!\n");
 	tprintf("I will take a large palindrome and test it.\n");
 	tprintf("Here it is:\n");
+*/
 	tprintf("%s\n", palindrome);
 
 	tprintf("Testing...");

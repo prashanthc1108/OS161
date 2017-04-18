@@ -60,7 +60,7 @@ runprogram(char *progname)
 	int result;
 
 	/* Open the file. */
-	
+	kprintf("runprogram:totalpages = %lu usedpages = %lu\n",totalnumberofpages,usedpages);	
 	result = vfs_open(progname, O_RDONLY, 0, &v);
 //	result = vfs_open((char*)"/testbin/argtest", O_RDONLY, 0, &v);
 	if (result) {

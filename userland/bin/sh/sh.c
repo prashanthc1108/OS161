@@ -531,8 +531,8 @@ void
 interactive(void)
 {
 	char buf[CMDLINE_MAX];
+//	char buf[60];
 	struct exitinfo ei;
-
 	while (1) {
 		printf("OS/161$ ");
 		getcmd(buf, sizeof(buf));
@@ -574,6 +574,7 @@ main(int argc, char *argv[])
 	 * or one that doesn't set argv when starting the first shell.
 	 */
 	if (argc == 0 || argc == 1) {
+
 		interactive();
 	}
 	else if (argc == 3 && !strcmp(argv[1], "-c")) {

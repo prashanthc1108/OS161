@@ -15,7 +15,7 @@ int
 sys___write(int fd, userptr_t buffer,size_t len,int32_t* retval)
 {
 	int result=0;
-	char localbuffer[len];
+	char* localbuffer = kmalloc(sizeof(char)*len);
 	size_t actual_len;
 	if(fd<0||fd>MAX_FT)
 		return EBADF;	
@@ -31,7 +31,8 @@ sys___write(int fd, userptr_t buffer,size_t len,int32_t* retval)
 	result = copyin(buffer,localbuffer,len);
 	if(result==EFAULT)
                 return EFAULT;
-        //TO DO has to be changed done only to pass console test
+	kfree(localbuffer);        
+//TO DO has to be changed done only to pass console test
 /*	if(fd==1)
 	{
 		struct mfilehandle *fh = getfhforfd(fd);
