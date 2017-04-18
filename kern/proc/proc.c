@@ -380,7 +380,8 @@ lock_release(processtable->proclock);
         }
         if(newproc->PID==-1)
 		{
-			kfree(newproc);
+			//kfree(newproc);
+			proc_destroy(newproc);
 			*retval=ENPROC;
 			return NULL;
 		}

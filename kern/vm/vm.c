@@ -47,7 +47,7 @@ getppages(unsigned long npages)
         spinlock_release(&stealmem_lock);
         return addr;
 */
-
+	spinlock_acquire(&stealmem_lock);
 	unsigned long i=0;
         paddr_t paddr;
 	for(;i<totalnumberofpages;i++)
@@ -72,6 +72,7 @@ getppages(unsigned long npages)
         }
         if(i==totalnumberofpages)
         {
+		spinlock_release(&stealmem_lock);
 	        return 0;
         }
 	unsigned long begin = i;
@@ -84,6 +85,7 @@ getppages(unsigned long npages)
         coremap[begin].chunksize = npages;
         paddr = (begin+1)*PAGE_SIZE;
 	usedpages += npages;
+	spinlock_release(&stealmem_lock);
         return paddr;
 
 
@@ -132,10 +134,10 @@ alloc_kpages(unsigned npages)
 */
 	paddr_t pa;
         vm_can_sleep();	
-	spinlock_acquire(&stealmem_lock);
+//	spinlock_acquire(&stealmem_lock);
 	pa = getppages(npages);
         
-	spinlock_release(&stealmem_lock);
+//	spinlock_release(&stealmem_lock);
 	if (pa==0) {
                 return 0;
         }
@@ -176,9 +178,9 @@ free_kpages(vaddr_t addr)
 */
 	paddr_t Kaddr = addr - MIPS_KSEG0;
        unsigned pageno = getpageno(Kaddr);
-	spinlock_acquire(&stealmem_lock);
+//	spinlock_acquire(&stealmem_lock);
 	freeppages(pageno);
-        spinlock_release(&stealmem_lock);
+ //       spinlock_release(&stealmem_lock);
 
 }
 
@@ -189,13 +191,15 @@ unsigned getpageno(paddr_t paddr)
 
 void freeppages(unsigned pageno)
 {
-        unsigned no_pages = coremap[pageno].chunksize;           
+        spinlock_acquire(&stealmem_lock);
+	unsigned no_pages = coremap[pageno].chunksize;           
         for(unsigned long i=pageno;i<pageno+no_pages;i++)
         {
         coremap[i].pagestate = FREE_STATE;
         coremap[i].chunksize=0;
         }
         usedpages-=no_pages;
+	spinlock_release(&stealmem_lock);
         //lock_release(coremaplock);
 }
 
@@ -289,9 +293,9 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 	struct node* listentry = getpagetableentry(faultaddress,as->head);
 	if(listentry==NULL)
 	{
-		spinlock_acquire(&stealmem_lock);
+	//	spinlock_acquire(&stealmem_lock);
 		paddr = getppages(1);
-	        spinlock_release(&stealmem_lock);
+	  //      spinlock_release(&stealmem_lock);
 		if (paddr == 0) 
                         return ENOMEM;
 		as->tail = addpagetableentries(faultaddress,paddr,as->tail);

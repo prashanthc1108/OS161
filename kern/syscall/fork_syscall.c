@@ -21,7 +21,7 @@ int sys___fork(struct trapframe *tf,int32_t* retval)
 	*retval = as_copy(curthread->t_proc->p_addrspace, &newproc->p_addrspace);
 	if(*retval)
 		{
-//		kprintf("here\n");
+//		kprintf("\nhere1\n");
 		proc_destroy(newproc);
 		return *retval;
 		}
@@ -29,14 +29,22 @@ int sys___fork(struct trapframe *tf,int32_t* retval)
 	struct trapframe* newtf = (struct trapframe*)kmalloc(sizeof(struct trapframe));
 	if(newtf==NULL)
 	{
-		kprintf("here\n");
+//		kprintf("\nhere2\n");
 		proc_destroy(newproc);
 		return ENOMEM;
 	}
 	*newtf = *tf;
 	*retval = newproc->PID;
-	thread_fork("childthread",newproc,enter_forked_process,newtf,0);
-        return 0;
+
+	*retval = thread_fork("childthread",newproc,enter_forked_process,newtf,0);
+        if(*retval)
+        {
+//                kprintf("\nhere3\n");
+		kfree(newtf);
+                proc_destroy(newproc);
+                return ENOMEM;
+        }
+	return 0;
 }
 /*
 void copyTF(struct trapframe *tf1,struct trapframe **tf2)
