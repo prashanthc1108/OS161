@@ -78,6 +78,7 @@ dofork(void)
 	if (pid < 0) {
 		warn("fork");
 	}
+//	printf("%d\n",pid);
 	return pid;
 }
 
@@ -124,10 +125,12 @@ dowait(int nowait, int pid)
 
 	if (pid<0) {
 		/* fork in question failed; just return */
+	//	printf("fork in question failed; just\n");
 		return;
 	}
 	if (pid==0) {
 		/* in the fork in question we were the child; exit */
+	//	printf("in the fork in question we were the child; exit\n");
 		exit(0);
 	}
 
@@ -188,7 +191,6 @@ test(int nowait)
 		// 0, 1, 2 are stdin, stdout, stderr
 		err(1, "Failed to open file to write data into\n");
 	}
-
 	pid0 = dofork();
 	nprintf(".");
 	write(fd, "A", 1);
@@ -245,6 +247,7 @@ test(int nowait)
 	if(fd < 3) {
 		err(1, "Failed to open file for verification\n");
 	}
+	
 	nprintf(".");
 
 	char buffer[30];
@@ -258,6 +261,10 @@ test(int nowait)
 	printf("\n%s\n", buffer);
 	if(len != 30) {
 		err(1, "Did not get expected number of characters\n");
+	}
+	else
+	{
+	printf("got expected num\n");
 	}
 	nprintf(".");
 	// Check if number of instances of each character is correct

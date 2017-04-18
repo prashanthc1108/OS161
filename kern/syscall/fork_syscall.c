@@ -34,7 +34,6 @@ int sys___fork(struct trapframe *tf,int32_t* retval)
 		return ENOMEM;
 	}
 	*newtf = *tf;
-	*retval = newproc->PID;
 
 	*retval = thread_fork("childthread",newproc,enter_forked_process,newtf,0);
         if(*retval)
@@ -44,6 +43,7 @@ int sys___fork(struct trapframe *tf,int32_t* retval)
                 proc_destroy(newproc);
                 return ENOMEM;
         }
+	*retval = newproc->PID;
 	return 0;
 }
 /*
