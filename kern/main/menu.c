@@ -121,8 +121,8 @@ common_prog(int nargs, char **args)
 	struct proc *proc;
 	int result;
 	unsigned tc;
-	kprintf("before anything\n");
-	kheap_printused();
+//	kprintf("before anything\n");
+//	kheap_printused();
 	/* Create a process for the new program to run in. */
 	proc = proc_create_runprogram(args[0] /* name */);
 	if (proc == NULL) {
@@ -149,11 +149,9 @@ common_prog(int nargs, char **args)
 	// especially once swapping is enabled.
 	thread_wait_for_count(tc);
 	proc_destroy(proc);
-	deletefh(read);
-	deletefh(write);
-	deletefh(error);
-	kprintf("Aftre everything\n");
-	kheap_printused();
+	deletestdfilehandles();
+//	kprintf("Aftre everything\n");
+//	kheap_printused();
 	 kprintf("\n%lu\n%lu\n",usedpages,totalnumberofpages);
 	return 0;
 }

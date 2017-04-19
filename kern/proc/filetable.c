@@ -96,9 +96,9 @@ int closefd(int fd)
 
 void deleteFT(struct filetable* ftab)
 {
+
 	for (int i=3;i<MAX_FT;i++)
 	{
-
 		if(ftab->ft[i]!=NULL){
 			deletefh(ftab->ft[i]);
 		}

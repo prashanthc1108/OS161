@@ -53,9 +53,12 @@ int sys___waitPID(pid_t pid,userptr_t status,int options,int32_t* retval)
 		}
 	}
 	kfree(dest);
+//	kheap_printused();
+	
 	lock_acquire(processtable->proclock);
 	deleteprocess(pid);
 	lock_release(processtable->proclock);
+//	kheap_printused();
 	return 0;
 	
 }

@@ -23,6 +23,7 @@ struct mfilehandle* read;
 struct mfilehandle* write;
 struct mfilehandle* error;
 void deletefh(struct mfilehandle* fh);
+void deletestdfilehandles(void);
 void initializestdfh(void);
 int isfdvalidforDUP2(int fd, int isOrigin);
 int clonefd(int ofd, int dfd);

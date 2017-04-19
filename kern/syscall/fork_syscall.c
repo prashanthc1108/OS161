@@ -15,10 +15,15 @@
 
 int sys___fork(struct trapframe *tf,int32_t* retval)
 {
+//	kheap_printused();
 	struct proc* newproc = create_new_proc("childproc",retval);
 	if(newproc==NULL)
 		return *retval;
+		
 	*retval = as_copy(curthread->t_proc->p_addrspace, &newproc->p_addrspace);
+	
+//	kheap_printused();
+	
 	if(*retval)
 		{
 //		kprintf("\nhere1\n");

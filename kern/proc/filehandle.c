@@ -65,6 +65,22 @@ void initializestdfh()
 	error = fh3;
 }
 
+void deletestdfilehandles()
+{
+	vfs_close(read->v_node);
+        lock_destroy(read->handlelock);
+        kfree(read);
+
+	vfs_close(write->v_node);
+        lock_destroy(write->handlelock);
+        kfree(write);
+
+	vfs_close(error->v_node);
+        lock_destroy(error->handlelock);
+        kfree(error);
+
+}
+
 void setstdfilehandle()
 {
 	struct mfilehandle* fh1;
