@@ -212,7 +212,7 @@ proc_destroy(struct proc *proc)
 	//MEMORY CLEAN UP NEEDED
 	kfree(proc->p_name);
 	sem_destroy(proc->pidsem);
-	kfree(proc->p_cwd);
+//	kfree(proc->p_cwd);
 	deleteFT(proc->ftab);
 	kfree(proc);
 }
@@ -371,9 +371,9 @@ proc_setas(struct addrspace *newas)
 struct proc *create_new_proc(const char *name,int32_t* retval)
 {
 struct proc *newproc;
-lock_acquire(processtable->proclock);
+	lock_acquire(processtable->proclock);
         newproc = proc_create(name);
-lock_release(processtable->proclock);
+	lock_release(processtable->proclock);
         if (newproc == NULL) {
 	*retval = ENOMEM;         
        return NULL;

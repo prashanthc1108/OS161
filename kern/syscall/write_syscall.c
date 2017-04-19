@@ -18,19 +18,26 @@ sys___write(int fd, userptr_t buffer,size_t len,int32_t* retval)
 	char* localbuffer = kmalloc(sizeof(char)*len);
 	size_t actual_len;
 	if(fd<0||fd>MAX_FT)
-		return EBADF;	
+		{
+		kfree(localbuffer);
+		return EBADF;
+		}	
 //	if(buffer==NULL||(buffer<=(userptr_t)0x40000000||buffer>=(userptr_t)0x80000000))
 //                return EFAULT;
         result = newcopycheck(buffer,len,&actual_len);
         if(result)
         {
  //       kprintf("valid");
+		kfree(localbuffer);
                 return result;
        }
 	(void)actual_len;
 	result = copyin(buffer,localbuffer,len);
 	if(result==EFAULT)
+	{
+		kfree(localbuffer);
                 return EFAULT;
+	}
 	kfree(localbuffer);        
 //TO DO has to be changed done only to pass console test
 /*	if(fd==1)

@@ -18,9 +18,11 @@ struct filetable
 {
         struct mfilehandle* ft[MAX_FT];
 };
+//struct lock* masterlock;
 struct mfilehandle* read;
 struct mfilehandle* write;
 struct mfilehandle* error;
+void deletefh(struct mfilehandle* fh);
 void initializestdfh(void);
 int isfdvalidforDUP2(int fd, int isOrigin);
 int clonefd(int ofd, int dfd);

@@ -101,7 +101,7 @@ ram_bootstrap(void)
 		coremap[i].chunksize = 0;
 	}
 	IsInitialized=0;
-	coremaplock = lock_create("coremaplock");	
+//	coremaplock = lock_create("coremaplock");	
 	kprintf("%uk physical memory available after coremap initialization\n",
                 (lastpaddr-firstpaddr)/1024);
 }

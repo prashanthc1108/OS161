@@ -88,15 +88,7 @@ int closefd(int fd)
 	}
 	else
 	{
-		fh->refcount--;
-		if(fh->refcount==0)
-                   {
-                       vfs_close(fh->v_node);
-                                        //TO DO clean up mfilehandle
-/*			lock_destroy(fh->handlelock);
-			kfree(fh);
-*/
-			 }
+		deletefh(fh);
 		curthread->t_proc->ftab->ft[fd] = NULL;
 		return  0;
 	}
@@ -104,14 +96,14 @@ int closefd(int fd)
 
 void deleteFT(struct filetable* ftab)
 {
-/*	for (int i=3;i<MAX_FT;i++)
+	for (int i=3;i<MAX_FT;i++)
 	{
 
 		if(ftab->ft[i]!=NULL){
-			closefd(i);
+			deletefh(ftab->ft[i]);
 		}
 	}
-*/
+
 	kfree(ftab);
 
 }
@@ -124,7 +116,11 @@ void copyft(struct filetable* ft1,struct filetable* ft2)
 	{
 		ft2->ft[i]=ft1->ft[i];	
 		if(ft1->ft[i]!=NULL)
+		{  
+		lock_acquire(ft1->ft[i]->handlelock);
 			ft1->ft[i]->refcount++;
+		lock_release(ft1->ft[i]->handlelock);
+		}
 	}
 }
 
@@ -163,6 +159,8 @@ int clonefd(int ofd, int dfd){
 		closefd(dfd);
 	}
 	curthread->t_proc->ftab->ft[dfd] = curthread->t_proc->ftab->ft[ofd];
+lock_acquire(curthread->t_proc->ftab->ft[dfd]->handlelock);	
 	curthread->t_proc->ftab->ft[dfd]->refcount++;
+lock_release(curthread->t_proc->ftab->ft[dfd]->handlelock);
 	return 0;
 }

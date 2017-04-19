@@ -77,11 +77,16 @@ static void deletesegs(struct addrspace *as)
 static void deletevandppages(struct addrspace *as)
 {
 	struct node* newtemp = as->head;
-        while(newtemp!=NULL&&newtemp->ptentry!=NULL)
+        while(newtemp!=NULL)
         {
-                struct node* prev = newtemp;
+		if(newtemp->ptentry==NULL)
+		{
+			kfree(newtemp);
+                	break;
+		}
+		struct node* prev = newtemp;
                 unsigned pageno = getpageno(prev->ptentry->paddr);
-                freeppages(pageno);
+		freeppages(pageno);
                 newtemp=newtemp->next;
 		kfree(prev->ptentry);
                 kfree(prev);
@@ -132,6 +137,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 	newtemp->nextseg = NULL;
 	if (newtemp==NULL) {
 		//MEMLEAK???
+//		as_destroy(new);
 		return ENOMEM;
 	}
 	while(temp!=NULL)
@@ -145,6 +151,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 				if (newtemp->nextseg==NULL) {
          		       //MEMLEAK???
 				deletesegs(new);		
+//				as_destroy(new);
                 		return ENOMEM; 
         			}
 				newtemp->nextseg->nextseg=NULL;
@@ -166,6 +173,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 			{
 			deletesegs(new); 
 			deletevandppages(new);
+//			as_destroy(new);
                         return ENOMEM;
 			}
 		new->tail = addpagetableentries(tempnode->ptentry->vaddr,paddr,new->tail);
@@ -173,6 +181,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 			{
 			deletesegs(new);
                         deletevandppages(new);
+//			as_destroy(new);
 			return ENOMEM;
 			}
 		memmove((void *)PADDR_TO_KVADDR(newtempnode->ptentry->paddr),

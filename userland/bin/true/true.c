@@ -29,7 +29,9 @@
 
 #include <unistd.h>
 #include <stdlib.h>
-
+#include <err.h>
+#include <time.h>
+#include <test161/test161.h>
 /*
  * true - succeed.
  */
@@ -38,5 +40,11 @@ int
 main(void)
 {
 	/* Just exit with success. */
-	exit(0);
+	int x = fork();
+	if(x)
+		printf("I am Parent\n");
+	else
+		printf("I am ze child\n");
+	
+//	exit(0);
 }

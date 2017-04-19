@@ -16,6 +16,7 @@ sys___read(int fd, userptr_t buffer,size_t len,int32_t* retval)
 {
         int result = 0;
 	size_t actual_len;
+//TO DO change this to the actual range. this is pathetic
 	if(buffer==NULL||buffer==(userptr_t)0x40000000)
 		return EFAULT;
 	result = newcopycheck(buffer,len,&actual_len);

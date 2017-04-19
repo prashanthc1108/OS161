@@ -73,6 +73,7 @@
  * It copies the program name because runprogram destroys the copy
  * it gets by passing it to vfs_open().
  */
+
 static
 void
 cmd_progthread(void *ptr, unsigned long nargs)
@@ -80,7 +81,6 @@ cmd_progthread(void *ptr, unsigned long nargs)
 	char **args = ptr;
 	char progname[128];
 	int result;
-
 	KASSERT(nargs >= 1);
 
 	if (nargs > 2) {
@@ -89,7 +89,7 @@ cmd_progthread(void *ptr, unsigned long nargs)
 
 	/* Hope we fit. */
 	KASSERT(strlen(args[0]) < sizeof(progname));
-		setstdfilehandle();	
+	setstdfilehandle();
 	strcpy(progname, args[0]);
 //	kprintf("\n%lu\n%lu\n",usedpages,totalnumberofpages);
 	result = runprogram(progname);
@@ -121,12 +121,13 @@ common_prog(int nargs, char **args)
 	struct proc *proc;
 	int result;
 	unsigned tc;
+	kprintf("before anything\n");
+	kheap_printused();
 	/* Create a process for the new program to run in. */
 	proc = proc_create_runprogram(args[0] /* name */);
 	if (proc == NULL) {
 		return ENOMEM;
 	}
-
 	tc = thread_count;
 
 	result = thread_fork(args[0] /* thread name */,
@@ -148,7 +149,12 @@ common_prog(int nargs, char **args)
 	// especially once swapping is enabled.
 	thread_wait_for_count(tc);
 	proc_destroy(proc);
-	// kprintf("\n%lu\n%lu\n",usedpages,totalnumberofpages);
+	deletefh(read);
+	deletefh(write);
+	deletefh(error);
+	kprintf("Aftre everything\n");
+	kheap_printused();
+	 kprintf("\n%lu\n%lu\n",usedpages,totalnumberofpages);
 	return 0;
 }
 

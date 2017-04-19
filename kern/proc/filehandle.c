@@ -111,24 +111,37 @@ void setstdfilehandle()
         fh3->offset=0;
         fh3->v_node=v_node3;
 
-	
+//	masterlock = lock_create("masterlock");	
 
 /*
 	curthread->t_proc->ftab->ft[0] = read;
 	curthread->t_proc->ftab->ft[1] = write;
 	curthread->t_proc->ftab->ft[2] = error;
 */
+	read=fh1;
+        write = fh2;
+        error = fh3;
 	curthread->t_proc->ftab->ft[0] = fh1;
         curthread->t_proc->ftab->ft[1] = fh2;
         curthread->t_proc->ftab->ft[2] = fh3;
 }
 
 
-void destroyfh(struct mfilehandle* fh)
+void deletefh(struct mfilehandle* fh)
 {
-	(void)fh;
-/*	lock_destroy(fh->handlelock);	
-	kfree(fh);*/	
+			 int count = 0;
+			 lock_acquire(fh->handlelock);
+                         fh->refcount--;
+			 count = fh->refcount;
+			 lock_release(fh->handlelock);
+                         if(count==0)
+                         {
+                         vfs_close(fh->v_node);
+                                        //TO DO clean up mfilehandle
+                         lock_destroy(fh->handlelock);
+                         kfree(fh);
+                         }
+
 }
 
 struct mfilehandle* getfilehandle(char *path, int openflags,int* ret)
