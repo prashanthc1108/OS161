@@ -349,10 +349,10 @@ file      proc/proctable.c
 #
 
 file      vm/kmalloc.c
-file      vm/vm.c
-file      vm/addrspace.c
-file      vm/pagetable.c
-#optofffile dumbvm   vm/addrspace.c
+#file      vm/vm.c
+#file      vm/addrspace.c
+#file      vm/pagetable.c
+optofffile dumbvm   vm/addrspace.c
 
 #
 # Network
@@ -409,7 +409,7 @@ file      syscall/getcwd_syscall.c
 file      syscall/chdir_syscall.c
 file      syscall/dup2_syscall.c
 file      syscall/execv_syscall.c
-file	  syscall/sbrk_syscall.c
+#file	  syscall/sbrk_syscall.c
 #
 # Startup and initialization
 #

@@ -50,7 +50,7 @@ sys___execv(userptr_t progname, userptr_t args)
 	temps = (size_t*)kmalloc(sizeof(size_t));
 	if(temps==NULL)
 		{
-		kfree(progpath);
+		kfree(prog);
 		kfree(address);
 		return ENOMEM;
 		}
@@ -63,7 +63,7 @@ sys___execv(userptr_t progname, userptr_t args)
 		result = copyin(arg1,address,sizeof(userptr_t));	
 		if(result==EFAULT)
 			{
-			 kfree(progpath);
+			 kfree(prog);
                		 kfree(address);
 			kfree(temps);	
 			return EFAULT;
@@ -73,7 +73,7 @@ sys___execv(userptr_t progname, userptr_t args)
 		result = copyinstr(*address,kernbuffer+curpos,ARG_MAX,temps);
 		if(result==EFAULT)
 			{
-                         kfree(progpath);
+                         kfree(prog);
                          kfree(address);
                         kfree(temps);
 			return EFAULT;
