@@ -172,6 +172,6 @@ void ipi_broadcast(int code);
 void ipi_tlbshootdown(struct cpu *target, const struct tlbshootdown *mapping);
 
 void interprocessor_interrupt(void);
-
+void clearTLB(void);
 
 #endif /* _CPU_H_ */

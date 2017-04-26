@@ -50,7 +50,7 @@
 #include <addrspace.h>
 #include <mainbus.h>
 #include <vnode.h>
-
+#include <vm.h>
 
 /* Magic number used as a guard value on kernel thread stacks. */
 #define THREAD_STACK_MAGIC 0xbaadf00d
@@ -1194,6 +1194,21 @@ ipi_tlbshootdown(struct cpu *target, const struct tlbshootdown *mapping)
 
 	spinlock_release(&target->c_ipi_lock);
 }
+
+
+void clearTLB()
+{
+	unsigned i;
+	struct cpu *c;
+	for (i=0; i < cpuarray_num(&allcpus); i++) {
+                c = cpuarray_get(&allcpus, i);
+		const struct tlbshootdown tlbshoot;
+		ipi_tlbshootdown(c,&tlbshoot);
+		}
+
+}
+
+
 
 /*
  * Handle an incoming interprocessor interrupt.

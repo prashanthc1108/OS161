@@ -1,6 +1,8 @@
 #include <types.h>
 #include <lib.h>
 #include <pagetable.h>
+#include <synch.h>
+
 /*
 struct ptable* initializepagetable()
 {
@@ -90,35 +92,48 @@ struct node* initializepagetable()
 
 //returns the new tail. returning tail so that addition is O(1)
 //Have not included permission information in PTE
-struct node* addpagetableentries(vaddr_t vaddr,paddr_t paddr,struct node* tail)
+struct node* addpagetableentries(vaddr_t vaddr,paddr_t paddr,struct node* tail,struct addrspace* as)
 {
-	int pageno = getpageno(paddr);
-        int chunksize = coremap[pageno].chunksize;
+	(void)as;
+//	int pageno = getpageno(paddr);
+//        int chunksize = coremap[pageno].chunksize;
 	vaddr_t newvadd = vaddr & PAGE_FRAME;
 	struct node* newtail = tail;
-	for(int i=0;i<chunksize;i++)
-	{
+//	lock_acquire(as->ptlock);
+//	for(int i=0;i<chunksize;i++)
+//	{
         	newtail->next = kmalloc(sizeof(struct node));
 		if(newtail->next==NULL)
+		{
+			lock_release(as->ptlock);
                         return NULL;
+		}
 		newtail->next->ptentry = NULL;
 		newtail->next->next =NULL;
 		newtail->ptentry = kmalloc(sizeof(struct pte));
                 if(newtail->ptentry==NULL)
+		{
+			lock_release(as->ptlock);
                         return NULL;
-		newtail->ptentry->vaddr = newvadd+i*PAGE_SIZE;
-        	newtail->ptentry->paddr = paddr+i*PAGE_SIZE;
+		}
+//		newtail->ptentry->vaddr = newvadd+i*PAGE_SIZE;
+//        	newtail->ptentry->paddr = paddr+i*PAGE_SIZE;
+		newtail->ptentry->vaddr = newvadd;
+                newtail->ptentry->paddr = paddr;
+		newtail->ptentry->swapped = false;
 		newtail = newtail->next;
-	}
-	
+//	}
+//	lock_release(as->ptlock);
 	return newtail;
 }
 
-void deletepagetableentry(vaddr_t vaddr,struct node* head)
+void deletepagetableentry(vaddr_t vaddr,struct node* head,struct addrspace* as)
 {
+	(void)as;
 	vaddr_t newvadd = vaddr & PAGE_FRAME;
 	struct node* temp = head;
 	struct node* prev = head;
+//	lock_acquire(as->ptlock);
 	while(true)
 	{
 		if(temp->ptentry->vaddr!=newvadd)
@@ -126,7 +141,10 @@ void deletepagetableentry(vaddr_t vaddr,struct node* head)
 			prev = temp;	
 			temp = temp->next;
 			if(temp==NULL)
+			{
+				lock_release(as->ptlock);
 				return;
+			}
 		}
 		else
 		{
@@ -137,24 +155,63 @@ void deletepagetableentry(vaddr_t vaddr,struct node* head)
 	//MEMLEAK?
 	kfree(temp->ptentry);
 	kfree(temp);	
+//	lock_release(as->ptlock);
 }
 
-struct node* getpagetableentry(vaddr_t vaddr,struct node* head)
+struct node* getpagetableentry(vaddr_t vaddr,struct node* head,struct addrspace* as)
 {
+	(void)as;
 	vaddr_t newvadd = vaddr & PAGE_FRAME;
 	struct node* temp = head;
+//	lock_acquire(as->ptlock);
 	while(temp->ptentry!=NULL)
 	{
 			if(temp->ptentry->vaddr!=newvadd)
                 	{	       
                         temp = temp->next;
                         if(temp==NULL)
+				{
+//				lock_release(as->ptlock);
                                 return NULL;
+				}
                 	}
                 	else
                 	{
+//				lock_release(as->ptlock);
                         	return temp;
                 	}
 	}
+//	lock_release(as->ptlock);
 	return NULL;
 }
+
+
+struct node* getpagetableentrywithpaddr(paddr_t paddr,struct node* head,struct addrspace* as)
+{
+	(void)as;
+        paddr_t newvadd = paddr & PAGE_FRAME;
+        struct node* temp = head;
+//	lock_acquire(as->ptlock);
+        while(temp->ptentry!=NULL)
+        {
+                        if(temp->ptentry->paddr!=newvadd)
+                        {
+                        temp = temp->next;
+                        if(temp==NULL)
+			{
+//                        	lock_release(as->ptlock);
+			        return NULL;
+                        
+			}
+			}
+                        else
+                        {
+//				lock_release(as->ptlock);
+                                return temp;
+                        }
+        }
+//	lock_release(as->ptlock);
+	(void)as;  
+      return NULL;
+}
+

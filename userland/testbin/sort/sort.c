@@ -73,7 +73,6 @@ static void *
 local_memcpy(void *dst, const void *src, size_t len)
 {
 	size_t i;
-
 	/*
 	 * memcpy does not support overlapping buffers, so always do it
 	 * forwards. (Don't change this without adjusting memmove.)
@@ -133,9 +132,11 @@ sort(int *arr, int size)
 	while (i<pivot && j<size) {
 		progress();
 		if (arr[i] < arr[j]) {
+//			printf("here1");
 			tmp[k++] = arr[i++];
 		}
 		else {
+//			printf("here2");
 			tmp[k++] = arr[j++];
 		}
 	}
@@ -193,6 +194,7 @@ main(void)
 {
 	initarray();
 //	printf("\ninitialized...");
+	printf("%d\n",SIZE);
 	sort(A, SIZE);
 	check();
 	return 0;

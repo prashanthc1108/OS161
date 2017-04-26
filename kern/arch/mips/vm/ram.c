@@ -95,12 +95,13 @@ ram_bootstrap(void)
         }
 	coremap[firstcoremappage].chunksize = corepages;
 	usedpages = totalpagessofar;
+	LRUstartindex = usedpages;
+	LRUindex=LRUstartindex;
 	for(;i<totalnumberofpages;i++)
 	{
 		coremap[i].pagestate = FREE_STATE;
 		coremap[i].chunksize = 0;
 	}
-	IsInitialized=0;
 //	coremaplock = lock_create("coremaplock");	
 	kprintf("%uk physical memory available after coremap initialization\n",
                 (lastpaddr-firstpaddr)/1024);

@@ -45,12 +45,12 @@ int sys___sbrk(intptr_t amount,int32_t* retval)
 			vaddr_t addr = as->as_heapvbase+newnum*PAGE_SIZE;
 			for(int i=0;i<-npages;i++)
 			{
-				struct node* node = getpagetableentry(addr+i*PAGE_SIZE,as->head);
+				struct node* node = getpagetableentry(addr+i*PAGE_SIZE,as->head,as);
 				if(node==NULL)
 					continue;
 				unsigned pageno = getpageno(node->ptentry->paddr);
                 		freeppages(pageno);
-				deletepagetableentry(addr+i*PAGE_SIZE,as->head);
+				deletepagetableentry(addr+i*PAGE_SIZE,as->head,as);
 			}		
 		as_activate();
 		}	

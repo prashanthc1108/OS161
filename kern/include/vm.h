@@ -38,6 +38,7 @@
 
 #include <mainbus.h>
 #include <machine/vm.h>
+
 /* Fault-type arguments to vm_fault() */
 #define VM_FAULT_READ        0    /* A read was attempted */
 #define VM_FAULT_WRITE       1    /* A write was attempted */
@@ -52,7 +53,39 @@ struct coremapentry
 {
 	unsigned int pagestate;
 	unsigned long chunksize;
+	bool recentlyused;
+	int PID;
 };
+
+
+
+
+struct bitmap *swap_bitmap;
+struct lock* swap_lock;
+bool SWAPPINGENABLED;
+struct vnode* disk_v_node;
+void get_swap_bitmap(void);
+int blockread(unsigned, paddr_t);
+unsigned blockwrite(paddr_t,unsigned* freeLocOnDisk);
+void deleteFromDisk(unsigned);
+
+
+
+
+unsigned long LRUindex;
+unsigned long LRUstartindex;
+
+
+
+
+
+
+
+
+
+
+
+
 struct lock* coremaplock;
 struct coremapentry * coremap;
 unsigned long usedpages;
@@ -60,14 +93,13 @@ unsigned long usedpages;
 unsigned long  totalnumberofpages;
 /* Initialization function */
 void vm_bootstrap(void);
-int IsInitialized;
 /* Fault handling function called by trap code */
 int vm_fault(int faulttype, vaddr_t faultaddress);
 
 /* Allocate/free kernel heap pages (called by kmalloc/kfree) */
 vaddr_t alloc_kpages(unsigned npages);
 void free_kpages(vaddr_t addr);
-//paddr_t getppages(unsigned long npages);
+paddr_t getppages(unsigned long npages);
 unsigned getpageno(paddr_t paddr);
 void freeppages(unsigned pageno);
 /*

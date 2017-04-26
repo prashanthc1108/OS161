@@ -74,6 +74,7 @@ struct addrspace {
 	size_t cur_heappages;
 	struct node* head;
 	struct node* tail;	
+	struct lock* ptlock;
 #endif
 };
 

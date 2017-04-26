@@ -39,7 +39,7 @@
 #include <current.h>
 #include <mips/tlb.h>
 #include <pagetable.h>
-
+#include <synch.h>
 
 //has to be changed
 #define STACK_TEMP_VALUE    801
@@ -77,7 +77,8 @@ static void deletesegs(struct addrspace *as)
 static void deletevandppages(struct addrspace *as)
 {
 	struct node* newtemp = as->head;
-        while(newtemp!=NULL)
+        //lock_acquire(as->ptlock);
+	 while(newtemp!=NULL)
         {
 		if(newtemp->ptentry==NULL)
 		{
@@ -85,12 +86,20 @@ static void deletevandppages(struct addrspace *as)
                 	break;
 		}
 		struct node* prev = newtemp;
-                unsigned pageno = getpageno(prev->ptentry->paddr);
+                if(prev->ptentry->swapped)
+		{
+			deleteFromDisk(prev->ptentry->diskaddr);
+		}
+		else
+		{
+		unsigned pageno = getpageno(prev->ptentry->paddr);
 		freeppages(pageno);
+		}
                 newtemp=newtemp->next;
 		kfree(prev->ptentry);
                 kfree(prev);
         }
+	//lock_release(as->ptlock);
 
 }
 struct addrspace *
@@ -103,6 +112,7 @@ as_create(void)
 	as->segments = NULL;
 	as->head = initializepagetable();        
 	as->tail = as->head;
+	as->ptlock = lock_create("as->ptlock");
 	return as;
 
 }
@@ -166,6 +176,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 
 	struct node* tempnode = old->head;
 	struct node* newtempnode = new->head;
+//	lock_acquire(old->ptlock);
 	while(tempnode!=old->tail)
 	{
 		paddr_t paddr = getppages(1);
@@ -173,23 +184,48 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 			{
 			deletesegs(new); 
 			deletevandppages(new);
+//		lock_release(old->ptlock);
 //			as_destroy(new);
                         return ENOMEM;
 			}
-		new->tail = addpagetableentries(tempnode->ptentry->vaddr,paddr,new->tail);
+		new->tail = addpagetableentries(tempnode->ptentry->vaddr,paddr,new->tail,new);
 		if(new->tail==NULL)
 			{
 			deletesegs(new);
                         deletevandppages(new);
+//		lock_release(old->ptlock);
 //			as_destroy(new);
 			return ENOMEM;
 			}
+
+		lock_acquire(old->ptlock);
+		if(tempnode->ptentry->swapped)
+		{
+			lock_release(old->ptlock);
+			if(swapin(tempnode->ptentry,old))
+				{
+					deletesegs(new);
+                        		deletevandppages(new);
+//		lock_release(old->ptlock);
+	                 		return ENOMEM;
+				}
 		memmove((void *)PADDR_TO_KVADDR(newtempnode->ptentry->paddr),
                 (const void *)PADDR_TO_KVADDR(tempnode->ptentry->paddr),
                 PAGE_SIZE);
+		stabilizenewallocation(tempnode->ptentry,curthread->t_proc->PID);
+		}
+		else
+		{
+		memmove((void *)PADDR_TO_KVADDR(newtempnode->ptentry->paddr),
+                (const void *)PADDR_TO_KVADDR(tempnode->ptentry->paddr),
+                PAGE_SIZE);
+		lock_release(old->ptlock);
+		}
+
 		tempnode = tempnode->next;
 		newtempnode = newtempnode->next;
 	}
+//		lock_release(old->ptlock);
 
         *ret = new;
         return 0;
@@ -222,7 +258,10 @@ as_destroy(struct addrspace *as)
 		newtemp=newtemp->next;
 		kfree(prev);
 	}*/
+	lock_acquire(as->ptlock);
 	deletevandppages(as);
+	lock_release(as->ptlock);
+	lock_destroy(as->ptlock);
 	kfree(as);
 }
 
@@ -372,8 +411,8 @@ as_prepare_load(struct addrspace *as)
 	(void)as;
   */
 	as->cur_stackpages = STACK_TEMP_VALUE;
-	int pageno = prev->as_vbase/PAGE_SIZE-1;
-        int heappageno = pageno + prev->as_npages+1;
+	int pageno = prev->as_vbase/PAGE_SIZE;
+        int heappageno = pageno + prev->as_npages;
         as->as_heapvbase = heappageno*PAGE_SIZE;
 	as->cur_heappages = TEMP_VALUE;
 	return 0;

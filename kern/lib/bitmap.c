@@ -46,12 +46,12 @@
 #define BITS_PER_WORD   (CHAR_BIT)
 #define WORD_TYPE       unsigned char
 #define WORD_ALLBITS    (0xff)
-
+/*
 struct bitmap {
         unsigned nbits;
         WORD_TYPE *v;
 };
-
+*/
 
 struct bitmap *
 bitmap_create(unsigned nbits)

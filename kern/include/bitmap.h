@@ -29,7 +29,7 @@
 
 #ifndef _BITMAP_H_
 #define _BITMAP_H_
-
+#define WORD_TYPE  unsigned char
 /*
  * Fixed-size array of bits. (Intended for storage management.)
  *
@@ -45,7 +45,13 @@
  */
 
 
-struct bitmap;  /* Opaque. */
+//struct bitmap;  /* Opaque. */
+
+struct bitmap {
+        unsigned nbits;
+        WORD_TYPE *v;
+};
+
 
 struct bitmap *bitmap_create(unsigned nbits);
 void          *bitmap_getdata(struct bitmap *);

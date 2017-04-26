@@ -11,6 +11,13 @@
 #include <pagetable.h>
 #include <addrspace.h>
 #include <synch.h>
+#include <vnode.h>
+#include <stat.h>
+#include <vfs.h>
+#include <kern/fcntl.h>
+#include <bitmap.h>
+#include <uio.h>
+#include <proctable.h>
 
 static struct spinlock stealmem_lock = SPINLOCK_INITIALIZER;
 //static struct spinlock vm_lock = SPINLOCK_INITIALIZER;
@@ -18,8 +25,79 @@ static struct spinlock stealmem_lock = SPINLOCK_INITIALIZER;
 void
 vm_bootstrap()
 {
-	IsInitialized = 1;
+	SWAPPINGENABLED = false;
+	get_swap_bitmap();
 }
+
+
+
+void get_swap_bitmap(){
+	disk_v_node = kmalloc(sizeof(struct vnode));
+        off_t swapSize;
+        struct stat metadata;
+        unsigned numberOfSwapPages;
+        char disk[32];
+        strcpy(disk,"lhd0raw:");
+        int ret = vfs_open(disk,O_RDWR,0664,&disk_v_node);
+        if(ret == 0){
+                SWAPPINGENABLED = true;
+                VOP_STAT(disk_v_node,&metadata);
+                swapSize = metadata.st_size;
+                numberOfSwapPages = swapSize/PAGE_SIZE;
+                if(swapSize%PAGE_SIZE)
+                        numberOfSwapPages++;
+                swap_bitmap = bitmap_create(numberOfSwapPages);
+        	swap_lock = lock_create("swaplock");
+		}
+}
+
+int blockread(unsigned slot, paddr_t dest)
+{
+	off_t disk_offset = slot*PAGE_SIZE;
+
+        struct iovec iov;
+        struct uio ku;
+
+	lock_acquire(swap_lock);
+	uio_kinit(&iov, &ku, (userptr_t)PADDR_TO_KVADDR(dest), PAGE_SIZE, disk_offset, UIO_READ);
+        int result = VOP_READ(disk_v_node, &ku);
+	bitmap_unmark(swap_bitmap,slot);
+	lock_release(swap_lock);
+	return result;
+
+}
+
+unsigned blockwrite(paddr_t src,unsigned* freeLocOnDisk){
+	lock_acquire(swap_lock);
+	int ret = bitmap_alloc(swap_bitmap, freeLocOnDisk);
+	off_t disk_offset = *freeLocOnDisk*PAGE_SIZE;
+	if(ret!=0){
+	//no space on disk, return appropriately
+	lock_release(swap_lock);
+	return ret;
+	}
+	else
+	{
+		struct iovec iov;
+		struct uio ku;
+
+		uio_kinit(&iov, &ku, (userptr_t)PADDR_TO_KVADDR(src), PAGE_SIZE, disk_offset, UIO_WRITE);
+		
+		int result = VOP_WRITE(disk_v_node, &ku);
+		//what to do with result?
+		(void)result;
+		lock_release(swap_lock);
+		
+		return 0;
+	}
+}
+
+void deleteFromDisk(unsigned slot){
+	lock_acquire(swap_lock);
+	bitmap_unmark(swap_bitmap,slot);
+	lock_release(swap_lock);
+}
+
 
 
 unsigned
@@ -32,30 +110,112 @@ void
 vm_tlbshootdown(const struct tlbshootdown *ts)
 {
         (void)ts;
-        panic("vm tried to do tlb shootdown?!\n");
+//        panic("vm tried to do tlb shootdown?!\n");
+
+	as_activate();
 }
 
-paddr_t
-getppages(unsigned long npages)
+int LRU(unsigned long npages)
 {
-/*        paddr_t addr;
-
-        spinlock_acquire(&stealmem_lock);
-
-        addr = ram_stealmem(npages);
-
-        spinlock_release(&stealmem_lock);
-        return addr;
-*/
 	spinlock_acquire(&stealmem_lock);
-	unsigned long i=0;
-        paddr_t paddr;
+	unsigned long i;
+	while(true)
+	{
+	i = LRUindex;
 	for(;i<totalnumberofpages;i++)
-        {       
+		{
+		if(coremap[i].pagestate==FIXED_STATE)
+			continue;
+		if(coremap[i].recentlyused)
+			coremap[i].recentlyused = false;
+		else
+			{
+
+			unsigned long j=i;
+			unsigned long max=i+npages;
+			for(;j<max;j++)
+				coremap[j].pagestate=FIXED_STATE;
+			LRUindex = i+1;
+			if(LRUindex==totalnumberofpages)
+				LRUindex = LRUstartindex;
+			spinlock_release(&stealmem_lock);
+			return i;
+			}		 	
+		}
+	LRUindex=LRUstartindex;
+	}	
+	spinlock_release(&stealmem_lock);
+	return 0;
+}
+
+paddr_t swapout(unsigned long npages)
+{
+	int pageno = LRU(npages);
+	for(unsigned long i=0;i<npages;i++)
+		{
+		struct proc* process = getprocessforPID(coremap[pageno+i].PID);
+		if(process!=NULL)
+		{
+		struct addrspace* addr = process->p_addrspace; 
+		if(addr!=NULL&&addr->head!=NULL)
+		{
+		lock_acquire(addr->ptlock);
+		clearTLB();		
+		struct pte* ptentry =  getpagetableentrywithpaddr((pageno+i)*PAGE_SIZE,addr->head,addr)->ptentry;
+		unsigned freeLocOnDisk;
+		unsigned index = blockwrite((pageno+i)*PAGE_SIZE,&freeLocOnDisk);
+		
+		if(index==ENOSPC)
+		{
+		if(addr!=curthread->t_proc->p_addrspace)
+		lock_release(addr->ptlock);
+		return 0;
+		}
+		ptentry->paddr = 0;
+		ptentry->diskaddr = freeLocOnDisk;
+		ptentry->swapped = true;
+		
+	//	as_activate();
+
+/*		for (int j=0; j < cpuarray_num(&allcpus); j++) {
+                c = cpuarray_get(&allcpus, i);
+       		ipi_tlbshootdown(c,tlbshootdown); 
+		}
+*/
+//		if(addr!=curthread->t_proc->p_addrspace)
+		lock_release(addr->ptlock);
+		}
+		}
+		}
+	return (pageno)*PAGE_SIZE;
+}
+
+
+int swapin(struct pte* ptentry,struct addrspace* addr)
+{
+	paddr_t paddr = getppages(1);
+	if(paddr==0)
+	{
+		return ENOMEM;
+	}
+	(void)addr;
+	blockread(ptentry->diskaddr,paddr);
+	ptentry->swapped=false;
+	ptentry->paddr = paddr;
+	return 0;	
+}
+
+static paddr_t getppagesifpresent(unsigned long npages)
+{
+	spinlock_acquire(&stealmem_lock);
+        unsigned long i=0;
+        paddr_t paddr;
+        for(;i<totalnumberofpages;i++)
+        {
                 if(coremap[i].pagestate == FREE_STATE)
                         {
                                 bool isValid = false;
-                                if(i+npages<totalnumberofpages)
+                                if(i+npages<=totalnumberofpages)
                                 {
                                 unsigned long  j=0;
                                 for(;j<npages;j++)
@@ -72,24 +232,40 @@ getppages(unsigned long npages)
         }
         if(i==totalnumberofpages)
         {
-		spinlock_release(&stealmem_lock);
-	        return 0;
+                spinlock_release(&stealmem_lock);
+                return 0;
         }
-	unsigned long begin = i;
+        unsigned long begin = i;
         unsigned long end = begin + npages;
-        for(;i<end;i++)
+	for(;i<end;i++)
         {
         coremap[i].pagestate = FIXED_STATE;
         coremap[i].chunksize = 0;
         }
         coremap[begin].chunksize = npages;
-        paddr = (begin+1)*PAGE_SIZE;
-	usedpages += npages;
-	spinlock_release(&stealmem_lock);
+        paddr = (begin)*PAGE_SIZE;
+        usedpages += npages;
+        spinlock_release(&stealmem_lock);
         return paddr;
 
 
+}
 
+paddr_t
+getppages(unsigned long npages)
+{
+	paddr_t paddr;
+	paddr = getppagesifpresent(npages);
+//	kprintf("%lu\n",(unsigned long int)paddr);
+	if(paddr==0)
+	{
+	if(curthread->t_proc->PID==2||!SWAPPINGENABLED)
+                {
+                return 0;
+                }
+	paddr = swapout(npages);
+	}
+	return paddr;
 }
 
 
@@ -186,12 +362,13 @@ free_kpages(vaddr_t addr)
 
 unsigned getpageno(paddr_t paddr)
 {
-	return paddr/PAGE_SIZE-1;
+	return paddr/PAGE_SIZE;
 }
 
 void freeppages(unsigned pageno)
 {
         spinlock_acquire(&stealmem_lock);
+	
 	unsigned no_pages = coremap[pageno].chunksize;           
         for(unsigned long i=pageno;i<pageno+no_pages;i++)
         {
@@ -210,6 +387,15 @@ as_zero_region(paddr_t paddr, unsigned npages)
         bzero((void *)PADDR_TO_KVADDR(paddr), npages * PAGE_SIZE);
 }
 
+void stabilizenewallocation(struct pte* ptentry,int PID)
+{
+	spinlock_acquire(&stealmem_lock);
+                unsigned long pageno = getpageno(ptentry->paddr);
+                coremap[pageno].pagestate = DIRTY_STATE;
+                coremap[pageno].PID = PID;
+                coremap[pageno].recentlyused = true;
+                spinlock_release(&stealmem_lock);
+}
 
 int
 vm_fault(int faulttype, vaddr_t faultaddress)
@@ -276,7 +462,9 @@ vm_fault(int faulttype, vaddr_t faultaddress)
         	stackbase = USERSTACK - as->cur_stackpages * PAGE_SIZE;
         	stacktop = USERSTACK;
 		if (faultaddress >= stackbase && faultaddress < stacktop)
+		{
 			success = true;
+		}
 	}
 	if(success == false)
 	{
@@ -289,23 +477,42 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 			return EFAULT;
 	}
         
-	
-	struct node* listentry = getpagetableentry(faultaddress,as->head);
+//	lock_acquire(as->ptlock);	
+	struct node* listentry = getpagetableentry(faultaddress,as->head,as);
 	if(listentry==NULL)
 	{
-	//	spinlock_acquire(&stealmem_lock);
 		paddr = getppages(1);
-	  //      spinlock_release(&stealmem_lock);
 		if (paddr == 0) 
                         return ENOMEM;
-		as->tail = addpagetableentries(faultaddress,paddr,as->tail);
-//		kprintf("\n%lu\n",usedpages);
+		as->tail = addpagetableentries(faultaddress,paddr,as->tail,as);
 		as_zero_region(paddr, 1);
+		spinlock_acquire(&stealmem_lock);
+		unsigned long pageno = getpageno(paddr);
+		coremap[pageno].pagestate = DIRTY_STATE;
+		coremap[pageno].PID = curthread->t_proc->PID;
+		coremap[pageno].recentlyused = true;
+		spinlock_release(&stealmem_lock);	
 	}
 	else
-	{	
-	paddr = listentry->ptentry->paddr;
+	{
+		lock_acquire(as->ptlock);
+		if(listentry->ptentry->swapped)
+		{
+			lock_release(as->ptlock);
+			if(swapin(listentry->ptentry,as))
+			{
+			return ENOMEM;
+			}
+		paddr = listentry->ptentry->paddr;
+		stabilizenewallocation(listentry->ptentry,curthread->t_proc->PID);
+		}
+		else
+		{
+			paddr = listentry->ptentry->paddr;
+			lock_release(as->ptlock);
+		}
 	}
+//	lock_release(as->ptlock);
 	/* make sure it's page-aligned */
         KASSERT((paddr & PAGE_FRAME) == paddr);
 
