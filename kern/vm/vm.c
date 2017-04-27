@@ -154,37 +154,28 @@ paddr_t swapout(unsigned long npages)
 	for(unsigned long i=0;i<npages;i++)
 		{
 		struct proc* process = getprocessforPID(coremap[pageno+i].PID);
-		if(process!=NULL)
-		{
-		struct addrspace* addr = process->p_addrspace; 
-		if(addr!=NULL&&addr->head!=NULL)
-		{
-		lock_acquire(addr->ptlock);
-		clearTLB();		
-		struct pte* ptentry =  getpagetableentrywithpaddr((pageno+i)*PAGE_SIZE,addr->head,addr)->ptentry;
-		unsigned freeLocOnDisk;
-		unsigned index = blockwrite((pageno+i)*PAGE_SIZE,&freeLocOnDisk);
+			if(process!=NULL)
+			{
+			struct addrspace* addr = process->p_addrspace; 
+			if(addr!=NULL&&addr->head!=NULL)
+				{
+				lock_acquire(addr->ptlock);
+				clearTLB();		
+				struct pte* ptentry =  getpagetableentrywithpaddr((pageno+i)*PAGE_SIZE,addr->head,addr)->ptentry;
+				unsigned freeLocOnDisk;
+				unsigned index = blockwrite((pageno+i)*PAGE_SIZE,&freeLocOnDisk);
 		
-		if(index==ENOSPC)
-		{
-		lock_release(addr->ptlock);
-		return 0;
-		}
-		ptentry->paddr = 0;
-		ptentry->diskaddr = freeLocOnDisk;
-		ptentry->swapped = true;
-		
-	//	as_activate();
-
-/*		for (int j=0; j < cpuarray_num(&allcpus); j++) {
-                c = cpuarray_get(&allcpus, i);
-       		ipi_tlbshootdown(c,tlbshootdown); 
-		}
-*/
-//		if(addr!=curthread->t_proc->p_addrspace)
-		lock_release(addr->ptlock);
-		}
-		}
+				if(index==ENOSPC)
+					{
+					lock_release(addr->ptlock);
+					return 0;
+					}
+				ptentry->paddr = 0;
+				ptentry->diskaddr = freeLocOnDisk;
+				ptentry->swapped = true;
+				lock_release(addr->ptlock);
+				}
+			}
 		}
 	return (pageno)*PAGE_SIZE;
 }
@@ -197,10 +188,11 @@ int swapin(struct pte* ptentry,struct addrspace* addr)
 	{
 		return ENOMEM;
 	}
-	(void)addr;
+	lock_acquire(addr->ptlock);
 	blockread(ptentry->diskaddr,paddr);
 	ptentry->swapped=false;
 	ptentry->paddr = paddr;
+	lock_release(addr->ptlock);
 	return 0;	
 }
 
@@ -475,7 +467,6 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 		else
 			return EFAULT;
 	}
-        
 	lock_acquire(as->ptlock);	
 	struct node* listentry = getpagetableentry(faultaddress,as->head,as);
 	if(listentry==NULL)
