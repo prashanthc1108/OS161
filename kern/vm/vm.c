@@ -167,7 +167,6 @@ paddr_t swapout(unsigned long npages)
 		
 		if(index==ENOSPC)
 		{
-		if(addr!=curthread->t_proc->p_addrspace)
 		lock_release(addr->ptlock);
 		return 0;
 		}
@@ -477,10 +476,11 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 			return EFAULT;
 	}
         
-//	lock_acquire(as->ptlock);	
+	lock_acquire(as->ptlock);	
 	struct node* listentry = getpagetableentry(faultaddress,as->head,as);
 	if(listentry==NULL)
 	{
+		lock_release(as->ptlock);
 		paddr = getppages(1);
 		if (paddr == 0) 
                         return ENOMEM;
@@ -495,7 +495,6 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 	}
 	else
 	{
-		lock_acquire(as->ptlock);
 		if(listentry->ptentry->swapped)
 		{
 			lock_release(as->ptlock);
