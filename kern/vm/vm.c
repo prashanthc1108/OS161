@@ -32,7 +32,7 @@ vm_bootstrap()
 
 
 void get_swap_bitmap(){
-	disk_v_node = kmalloc(sizeof(struct vnode));
+//	disk_v_node = kmalloc(sizeof(struct vnode));
         off_t swapSize;
         struct stat metadata;
         unsigned numberOfSwapPages;
@@ -44,8 +44,8 @@ void get_swap_bitmap(){
                 VOP_STAT(disk_v_node,&metadata);
                 swapSize = metadata.st_size;
                 numberOfSwapPages = swapSize/PAGE_SIZE;
-                if(swapSize%PAGE_SIZE)
-                        numberOfSwapPages++;
+//                if(swapSize%PAGE_SIZE)
+//                        numberOfSwapPages++;
                 swap_bitmap = bitmap_create(numberOfSwapPages);
         	swap_lock = lock_create("swaplock");
 		}
