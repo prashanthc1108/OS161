@@ -20,7 +20,7 @@ int sys___fork(struct trapframe *tf,int32_t* retval)
 	struct proc* newproc = create_new_proc("childproc",retval);
 	if(newproc==NULL)
 		return *retval;
-	kprintf("%lu\n",usedpages);
+//	kprintf("%lu\n",usedpages);
 	*retval = as_copy(curthread->t_proc->p_addrspace, &newproc->p_addrspace);
 
 

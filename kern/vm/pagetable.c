@@ -105,7 +105,7 @@ struct node* addpagetableentries(vaddr_t vaddr,paddr_t paddr,struct node* tail,s
         	newtail->next = kmalloc(sizeof(struct node));
 		if(newtail->next==NULL)
 		{
-			lock_release(as->ptlock);
+//			lock_release(as->ptlock);
                         return NULL;
 		}
 		newtail->next->ptentry = NULL;
@@ -113,7 +113,7 @@ struct node* addpagetableentries(vaddr_t vaddr,paddr_t paddr,struct node* tail,s
 		newtail->ptentry = kmalloc(sizeof(struct pte));
                 if(newtail->ptentry==NULL)
 		{
-			lock_release(as->ptlock);
+//			lock_release(as->ptlock);
                         return NULL;
 		}
 //		newtail->ptentry->vaddr = newvadd+i*PAGE_SIZE;

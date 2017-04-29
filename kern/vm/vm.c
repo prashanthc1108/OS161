@@ -150,10 +150,10 @@ int LRU(unsigned long npages)
 
 paddr_t swapout(unsigned long npages)
 {
+	if(npages!=1)
+		kprintf("pages %lu\n",npages);
 	int pageno = LRU(npages);
-	for(unsigned long i=0;i<npages;i++)
-		{
-		struct proc* process = getprocessforPID(coremap[pageno+i].PID);
+		struct proc* process = getprocessforPID(coremap[pageno].PID);
 			if(process!=NULL)
 			{
 			struct addrspace* addr = process->p_addrspace; 
@@ -161,22 +161,28 @@ paddr_t swapout(unsigned long npages)
 				{
 				lock_acquire(addr->ptlock);
 				clearTLB();		
-				struct pte* ptentry =  getpagetableentrywithpaddr((pageno+i)*PAGE_SIZE,addr->head,addr)->ptentry;
+				struct node* newnode =  getpagetableentrywithpaddr(pageno*PAGE_SIZE,addr->head,addr);
+				if(newnode!=NULL&&newnode->ptentry!=NULL)
+				{
 				unsigned freeLocOnDisk;
-				unsigned index = blockwrite((pageno+i)*PAGE_SIZE,&freeLocOnDisk);
+				unsigned index = blockwrite(pageno*PAGE_SIZE,&freeLocOnDisk);
 		
 				if(index==ENOSPC)
 					{
 					lock_release(addr->ptlock);
 					return 0;
 					}
-				ptentry->paddr = 0;
-				ptentry->diskaddr = freeLocOnDisk;
-				ptentry->swapped = true;
+				newnode->ptentry->paddr = 0;
+				newnode->ptentry->diskaddr = freeLocOnDisk;
+				newnode->ptentry->swapped = true;
 				lock_release(addr->ptlock);
 				}
+				else
+				{
+				lock_release(addr->ptlock);
+				}
+				}
 			}
-		}
 	return (pageno)*PAGE_SIZE;
 }
 
