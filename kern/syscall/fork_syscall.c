@@ -22,7 +22,7 @@ int sys___fork(struct trapframe *tf,int32_t* retval)
 	if(newproc==NULL)
 		return *retval;
 //	kprintf("%lu\n",usedpages);
-	lock_acquire(copylock);
+//	lock_acquire(copylock);
 	*retval = as_copy(curthread->t_proc->p_addrspace, &newproc->p_addrspace);
 
 
@@ -42,7 +42,7 @@ int sys___fork(struct trapframe *tf,int32_t* retval)
 		temp=temp->next;
 	}
 	lock_release(newproc->p_addrspace->ptlock);
-	lock_release(copylock);
+//	lock_release(copylock);
 	copyft(curthread->t_proc->ftab,newproc->ftab);
 	struct trapframe* newtf = (struct trapframe*)kmalloc(sizeof(struct trapframe));
 	if(newtf==NULL)
