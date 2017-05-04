@@ -82,6 +82,7 @@ ram_bootstrap(void)
 	{
 		coremap[i].pagestate = FIXED_STATE;
 		coremap[i].chunksize = 1;
+		coremap[i].as = NULL;
 	}
 	unsigned long corepages = totalbytes/PAGE_SIZE;
 	if(totalbytes%PAGE_SIZE!=0)
@@ -92,6 +93,7 @@ ram_bootstrap(void)
         {
 		coremap[i].pagestate = FIXED_STATE;
 		coremap[i].chunksize = 1;
+		coremap[i].as = NULL;
         }
 	coremap[firstcoremappage].chunksize = corepages;
 	usedpages = totalpagessofar;
@@ -101,8 +103,10 @@ ram_bootstrap(void)
 	{
 		coremap[i].pagestate = FREE_STATE;
 		coremap[i].chunksize = 0;
+		coremap[i].as = NULL;
 	}
 //	coremaplock = lock_create("coremaplock");	
+//	swap_lock_acquire = lock_create("swaplockacquire");
 	kprintf("%uk physical memory available after coremap initialization\n",
                 (lastpaddr-firstpaddr)/1024);
 }

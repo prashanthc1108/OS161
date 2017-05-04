@@ -215,3 +215,40 @@ struct node* getpagetableentrywithpaddr(paddr_t paddr,struct node* head,struct a
       return NULL;
 }
 
+
+struct node* procaddpagetableentries(vaddr_t vaddr,unsigned index,struct node* tail,struct addrspace* as)
+{
+        (void)as;
+//      int pageno = getpageno(paddr);
+//        int chunksize = coremap[pageno].chunksize;
+        vaddr_t newvadd = vaddr & PAGE_FRAME;
+        struct node* newtail = tail;
+//      lock_acquire(as->ptlock);
+//      for(int i=0;i<chunksize;i++)
+//      {
+                newtail->next = kmalloc(sizeof(struct node));
+                if(newtail->next==NULL)
+                {
+//                      lock_release(as->ptlock);
+                        return NULL;
+                }
+                newtail->next->ptentry = NULL;
+                newtail->next->next =NULL;
+                newtail->ptentry = kmalloc(sizeof(struct pte));
+                if(newtail->ptentry==NULL)
+                {
+//                      lock_release(as->ptlock);
+                        return NULL;
+                }
+//              newtail->ptentry->vaddr = newvadd+i*PAGE_SIZE;
+//              newtail->ptentry->paddr = paddr+i*PAGE_SIZE;
+                newtail->ptentry->vaddr = newvadd;
+                newtail->ptentry->paddr = 0;
+                newtail->ptentry->swapped = true;
+		newtail->ptentry->diskaddr = index;
+                newtail = newtail->next;
+//      }
+//      lock_release(as->ptlock);
+        return newtail;
+}
+

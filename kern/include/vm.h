@@ -54,13 +54,15 @@ struct coremapentry
 	unsigned int pagestate;
 	unsigned long chunksize;
 	bool recentlyused;
-	int PID;
+//	int PID;
+	struct addrspace* as;
 };
 
 
 
 
 struct bitmap *swap_bitmap;
+struct lock* swap_lock_acquire;
 struct lock* swap_lock;
 bool SWAPPINGENABLED;
 struct vnode* disk_v_node;
@@ -102,6 +104,7 @@ void free_kpages(vaddr_t addr);
 paddr_t getppages(unsigned long npages);
 unsigned getpageno(paddr_t paddr);
 void freeppages(unsigned pageno);
+void procfreeppages(unsigned pageno);
 /*
  * Return amount of memory (in bytes) used by allocated coremap pages.  If
  * there are ongoing allocations, this value could change after it is returned

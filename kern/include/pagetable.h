@@ -34,6 +34,8 @@ struct node
 	struct pte* ptentry;
 	struct node* next;
 };
+
+struct lock* copylock;
 /*
 struct node* head;
 struct node* tail;
@@ -48,7 +50,7 @@ struct pte* getpagetableentry(vaddr_t vaddr);
 int LRU(unsigned long npages);
 paddr_t swapout(unsigned long npages);
 int swapin(struct pte* ptentry,struct addrspace* addr);
-void stabilizenewallocation(struct pte* ptentry,int PID);
+void stabilizenewallocation(struct pte* ptentry,struct addrspace* as);
 
 
 struct node* initializepagetable(void);
@@ -56,4 +58,5 @@ struct node* addpagetableentries(vaddr_t vaddr,paddr_t paddr,struct node* tail,s
 void deletepagetableentry(vaddr_t vaddr,struct node* head,struct addrspace* addr);
 struct node* getpagetableentry(vaddr_t vaddr,struct node* head,struct addrspace* addr);
 struct node* getpagetableentrywithpaddr(paddr_t paddr,struct node* head,struct addrspace* addr);
+struct node* procaddpagetableentries(vaddr_t vaddr,unsigned index,struct node* tail,struct addrspace* as);
 

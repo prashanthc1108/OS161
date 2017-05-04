@@ -212,7 +212,7 @@ as_copy(struct addrspace *old, struct addrspace **ret)
 		memmove((void *)PADDR_TO_KVADDR(newtempnode->ptentry->paddr),
                 (const void *)PADDR_TO_KVADDR(tempnode->ptentry->paddr),
                 PAGE_SIZE);
-		stabilizenewallocation(tempnode->ptentry,curthread->t_proc->PID);
+		stabilizenewallocation(tempnode->ptentry,old);
 		}
 		else
 		{
@@ -258,10 +258,12 @@ as_destroy(struct addrspace *as)
 		newtemp=newtemp->next;
 		kfree(prev);
 	}*/
+	lock_acquire(swap_lock_acquire);
 	lock_acquire(as->ptlock);
 	deletevandppages(as);
 	lock_release(as->ptlock);
 	lock_destroy(as->ptlock);
+	lock_release(swap_lock_acquire);
 	kfree(as);
 }
 

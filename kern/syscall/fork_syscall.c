@@ -14,6 +14,7 @@
 #include <mips/trapframe.h>
 #include <pagetable.h>
 
+
 int sys___fork(struct trapframe *tf,int32_t* retval)
 {
 //	kheap_printused();
@@ -21,6 +22,7 @@ int sys___fork(struct trapframe *tf,int32_t* retval)
 	if(newproc==NULL)
 		return *retval;
 //	kprintf("%lu\n",usedpages);
+	lock_acquire(copylock);
 	*retval = as_copy(curthread->t_proc->p_addrspace, &newproc->p_addrspace);
 
 
@@ -36,10 +38,11 @@ int sys___fork(struct trapframe *tf,int32_t* retval)
 	struct node* temp = newproc->p_addrspace->head;
 	while(temp!=newproc->p_addrspace->tail)
 	{
-		stabilizenewallocation(temp->ptentry,newproc->PID);
+		stabilizenewallocation(temp->ptentry,newproc->p_addrspace);
 		temp=temp->next;
 	}
 	lock_release(newproc->p_addrspace->ptlock);
+	lock_release(copylock);
 	copyft(curthread->t_proc->ftab,newproc->ftab);
 	struct trapframe* newtf = (struct trapframe*)kmalloc(sizeof(struct trapframe));
 	if(newtf==NULL)

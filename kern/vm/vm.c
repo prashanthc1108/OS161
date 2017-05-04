@@ -33,6 +33,8 @@ vm_bootstrap()
 
 void get_swap_bitmap(){
 //	disk_v_node = kmalloc(sizeof(struct vnode));
+	swap_lock_acquire = lock_create("swaplockacquire");
+	copylock =  lock_create("copylock");
         off_t swapSize;
         struct stat metadata;
         unsigned numberOfSwapPages;
@@ -124,7 +126,7 @@ int LRU(unsigned long npages)
 	i = LRUindex;
 	for(;i<totalnumberofpages;i++)
 		{
-		if(coremap[i].pagestate==FIXED_STATE)
+		if(coremap[i].pagestate==FIXED_STATE||coremap[i].pagestate==FREE_STATE)
 			continue;
 		if(coremap[i].recentlyused)
 			coremap[i].recentlyused = false;
@@ -150,55 +152,41 @@ int LRU(unsigned long npages)
 
 paddr_t swapout(unsigned long npages)
 {
-	if(npages!=1)
-		kprintf("pages %lu\n",npages);
+	lock_acquire(swap_lock_acquire);
 	int pageno = LRU(npages);
-		struct proc* process = getprocessforPID(coremap[pageno].PID);
-			if(process!=NULL)
-			{
-			struct addrspace* addr = process->p_addrspace; 
-			if(addr!=NULL&&addr->head!=NULL)
-				{
-				lock_acquire(addr->ptlock);
-				clearTLB();		
-				struct node* newnode =  getpagetableentrywithpaddr(pageno*PAGE_SIZE,addr->head,addr);
-				if(newnode!=NULL&&newnode->ptentry!=NULL)
-				{
-				unsigned freeLocOnDisk;
-				unsigned index = blockwrite(pageno*PAGE_SIZE,&freeLocOnDisk);
-		
-				if(index==ENOSPC)
-					{
-					lock_release(addr->ptlock);
-					return 0;
-					}
-				newnode->ptentry->paddr = 0;
-				newnode->ptentry->diskaddr = freeLocOnDisk;
-				newnode->ptentry->swapped = true;
-				lock_release(addr->ptlock);
-				}
-				else
-				{
-				lock_release(addr->ptlock);
-				}
-				}
-			}
+	struct addrspace* addr = coremap[pageno].as; 
+	lock_acquire(addr->ptlock);
+	clearTLB();		
+	struct node* newnode =  getpagetableentrywithpaddr(pageno*PAGE_SIZE,addr->head,addr);
+	unsigned freeLocOnDisk;
+	unsigned index = blockwrite(pageno*PAGE_SIZE,&freeLocOnDisk);
+	if(index==ENOSPC)
+	{
+		lock_release(addr->ptlock);
+		return 0;
+	}
+	newnode->ptentry->paddr = 0;
+	newnode->ptentry->diskaddr = freeLocOnDisk;
+	newnode->ptentry->swapped = true;
+	lock_release(addr->ptlock);
+	lock_release(swap_lock_acquire);
 	return (pageno)*PAGE_SIZE;
 }
 
 
 int swapin(struct pte* ptentry,struct addrspace* addr)
 {
+	(void)addr;
 	paddr_t paddr = getppages(1);
 	if(paddr==0)
 	{
 		return ENOMEM;
 	}
-	lock_acquire(addr->ptlock);
+//	lock_acquire(addr->ptlock);
 	blockread(ptentry->diskaddr,paddr);
 	ptentry->swapped=false;
 	ptentry->paddr = paddr;
-	lock_release(addr->ptlock);
+//	lock_release(addr->ptlock);
 	return 0;	
 }
 
@@ -370,12 +358,37 @@ void freeppages(unsigned pageno)
         for(unsigned long i=pageno;i<pageno+no_pages;i++)
         {
         coremap[i].pagestate = FREE_STATE;
-        coremap[i].chunksize=0;
+        coremap[i].as = NULL;
+	coremap[i].chunksize=0;
         }
         usedpages-=no_pages;
 	spinlock_release(&stealmem_lock);
         //lock_release(coremaplock);
 }
+
+void procfreeppages(unsigned pageno)
+{
+        spinlock_acquire(&stealmem_lock);
+
+        unsigned no_pages = coremap[pageno].chunksize;
+        for(unsigned long i=pageno;i<pageno+no_pages;i++)
+        {
+	if(coremap[i].pagestate == FIXED_STATE)
+	{
+	coremap[i].pagestate = CLEAN_STATE;
+	}
+	else
+	{
+        coremap[i].pagestate = FREE_STATE;
+        usedpages-=no_pages;
+	}
+        coremap[i].chunksize=0;
+        }
+        spinlock_release(&stealmem_lock);
+        //lock_release(coremaplock);
+}
+
+
 
 static
 void
@@ -384,14 +397,51 @@ as_zero_region(paddr_t paddr, unsigned npages)
         bzero((void *)PADDR_TO_KVADDR(paddr), npages * PAGE_SIZE);
 }
 
-void stabilizenewallocation(struct pte* ptentry,int PID)
+void stabilizenewallocation(struct pte* ptentry,struct addrspace* as)
 {
-	spinlock_acquire(&stealmem_lock);
+		spinlock_acquire(&stealmem_lock);
                 unsigned long pageno = getpageno(ptentry->paddr);
                 coremap[pageno].pagestate = DIRTY_STATE;
-                coremap[pageno].PID = PID;
+                coremap[pageno].as = as;
                 coremap[pageno].recentlyused = true;
                 spinlock_release(&stealmem_lock);
+}
+
+static int frob(vaddr_t faultaddress,paddr_t paddr)
+{
+	uint32_t ehi, elo;
+        int i;
+//	lock_release(as->ptlock);
+	/* make sure it's page-aligned */
+        KASSERT((paddr & PAGE_FRAME) == paddr);
+
+        /* Disable interrupts on this CPU while frobbing the TLB. */
+
+//	spinlock_acquire(&vm_lock);
+
+//	as_activate();
+        for (i=0; i<NUM_TLB; i++) {
+                tlb_read(&ehi, &elo, i);
+                if (elo & TLBLO_VALID) {
+		continue;
+                }
+                ehi = faultaddress;
+                elo = paddr | TLBLO_DIRTY | TLBLO_VALID;
+                DEBUG(DB_VM, "dumbvm: 0x%x -> 0x%x\n", faultaddress, paddr);
+                tlb_write(ehi, elo, i);
+  //      	spinlock_release(&vm_lock);	
+                return 0;
+        }
+	        as_activate();
+		ehi = faultaddress;
+                elo = paddr | TLBLO_DIRTY | TLBLO_VALID;
+                DEBUG(DB_VM, "dumbvm: 0x%x -> 0x%x\n", faultaddress, paddr);
+		tlb_write(ehi, elo, 0);
+    //    	spinlock_release(&vm_lock);	
+                return 0;       
+	kprintf("dumbvm: Ran out of TLB entries - cannot handle page fault\n");
+        return EFAULT;
+		
 }
 
 int
@@ -403,10 +453,8 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 */
 	vaddr_t stackbase,stacktop,heapbase,heaptop,vbase, vtop;
 	paddr_t paddr;
-        int i;
-        uint32_t ehi, elo;
-        struct addrspace *as;
         int spl;
+        struct addrspace *as;
 
         faultaddress &= PAGE_FRAME;
 
@@ -473,7 +521,10 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 		else
 			return EFAULT;
 	}
-	lock_acquire(as->ptlock);	
+        spl = splhigh();
+//	lock_acquire(swap_lock_acquire);
+	lock_acquire(as->ptlock);
+//	lock_release(swap_lock_acquire);	
 	struct node* listentry = getpagetableentry(faultaddress,as->head,as);
 	if(listentry==NULL)
 	{
@@ -483,12 +534,15 @@ vm_fault(int faulttype, vaddr_t faultaddress)
                         return ENOMEM;
 		as->tail = addpagetableentries(faultaddress,paddr,as->tail,as);
 		as_zero_region(paddr, 1);
+		int ret = frob(faultaddress,paddr);
 		spinlock_acquire(&stealmem_lock);
 		unsigned long pageno = getpageno(paddr);
 		coremap[pageno].pagestate = DIRTY_STATE;
-		coremap[pageno].PID = curthread->t_proc->PID;
+		coremap[pageno].as = as;
 		coremap[pageno].recentlyused = true;
 		spinlock_release(&stealmem_lock);	
+                splx(spl);
+		return ret;
 	}
 	else
 	{
@@ -500,47 +554,19 @@ vm_fault(int faulttype, vaddr_t faultaddress)
 			return ENOMEM;
 			}
 		paddr = listentry->ptentry->paddr;
-		stabilizenewallocation(listentry->ptentry,curthread->t_proc->PID);
+		int ret = frob(faultaddress,paddr);
+		stabilizenewallocation(listentry->ptentry,as);
+                splx(spl);
+		return ret;
 		}
 		else
 		{
 			paddr = listentry->ptentry->paddr;
+			int ret = frob(faultaddress,paddr);
 			lock_release(as->ptlock);
+                	splx(spl);
+			return ret;
 		}
 	}
-//	lock_release(as->ptlock);
-	/* make sure it's page-aligned */
-        KASSERT((paddr & PAGE_FRAME) == paddr);
-
-        /* Disable interrupts on this CPU while frobbing the TLB. */
-
-        spl = splhigh();
-//	spinlock_acquire(&vm_lock);
-
-//	as_activate();
-        for (i=0; i<NUM_TLB; i++) {
-                tlb_read(&ehi, &elo, i);
-                if (elo & TLBLO_VALID) {
-		continue;
-                }
-                ehi = faultaddress;
-                elo = paddr | TLBLO_DIRTY | TLBLO_VALID;
-                DEBUG(DB_VM, "dumbvm: 0x%x -> 0x%x\n", faultaddress, paddr);
-                tlb_write(ehi, elo, i);
-  //      	spinlock_release(&vm_lock);	
-                splx(spl);
-                return 0;
-        }
-	        as_activate();
-		ehi = faultaddress;
-                elo = paddr | TLBLO_DIRTY | TLBLO_VALID;
-                DEBUG(DB_VM, "dumbvm: 0x%x -> 0x%x\n", faultaddress, paddr);
-		tlb_write(ehi, elo, 0);
-    //    	spinlock_release(&vm_lock);	
-                splx(spl);
-                return 0;       
-	kprintf("dumbvm: Ran out of TLB entries - cannot handle page fault\n");
-        splx(spl);
-        return EFAULT;
 
 }

@@ -31,6 +31,8 @@ pid_t getPID(struct proc* p)
 
 struct proc* getprocessforPID(pid_t pid)
 {
+	if(pid<2||pid>=PID_MAX)
+		return NULL;
         return processtable->pt[pid];
 
 }
